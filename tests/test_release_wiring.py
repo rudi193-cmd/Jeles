@@ -83,6 +83,18 @@ def _names_a_non_suppressed_credential(value: object) -> bool:
     return any(c in text for c in NON_SUPPRESSED_CREDENTIALS)
 
 
+def test_the_credential_scan_catches_a_planted_token_and_not_github_token():
+    """Planted, both ways. The scan must see either accepted credential inside
+    the expression a workflow would actually write, and must *not* be satisfied
+    by `GITHUB_TOKEN` — the one whose events GitHub suppresses, which is the
+    failure this file guards against. A scan that matched on the word "token"
+    would pass every check below it for the wrong reason."""
+    assert _names_a_non_suppressed_credential("${{ secrets.RELEASE_PLEASE_TOKEN }}")
+    assert _names_a_non_suppressed_credential("${{ steps.app-token.outputs.token }}")
+    assert not _names_a_non_suppressed_credential("${{ secrets.GITHUB_TOKEN }}")
+    assert not _names_a_non_suppressed_credential({"token": "${{ github.token }}"})
+
+
 def test_the_tag_release_please_creates_matches_what_release_yml_listens_for():
     """With `include-component-in-tag` unset it defaults to *true*, and the tag
     becomes `<package-name>-vX.Y.Z` — which `v*` does not match, so the publish

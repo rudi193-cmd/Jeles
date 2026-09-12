@@ -129,6 +129,57 @@ def test_the_derivation_still_finds_something():
     assert any("query" in v for v in derived.values())
 
 
+def test_the_string_walk_catches_plain_and_f_string_literals():
+    """Planted: `_strings` is the primitive every role below is derived
+    through. A plain literal, the constant prefix of an f-string, and a literal
+    nested inside a call must all come back; a walk that lost f-strings would
+    lose every `https://host/{id}` citation URL in `sources.py`."""
+    tree = ast.parse(
+        "def f(x):\n"
+        "    a = 'https://plain.example.org/item'\n"
+        "    b = f'https://fmt.example.org/{x}'\n"
+        "    return g('nested.example.org', a, b)\n"
+    )
+    # Set equality, not `"https://…" in found`: CodeQL reads a URL literal on
+    # the left of `in` as an incomplete URL sanitization (py/incomplete-url-
+    # substring-sanitization, high) and turned the PR red for it. Equality is
+    # the stronger assertion anyway — nothing else may be in the walk.
+    assert set(_strings(tree)) == {
+        "https://plain.example.org/item",
+        "https://fmt.example.org/",      # the f-string's constant prefix
+        "nested.example.org",
+    }
+
+
+def test_the_role_derivation_catches_each_planted_role(tmp_path, monkeypatch):
+    """Planted: a synthetic `sources.py` whose one function proves all three
+    roles at once — a URL it emits through `_result(url=...)` (citation), a
+    host it only queries (query), and an XML namespace URI (namespace). The
+    derivation must find exactly those, so a change that stopped following
+    `_result` keywords or assignments to their names would fail here, not
+    silently shrink the lower bound the card test relies on."""
+    fake = tmp_path / "sources.py"
+    fake.write_text(
+        "def search_planted(q, n):\n"
+        "    ns = 'http://www.loc.gov/zing/srw/'\n"
+        "    _get(f'https://query.example.net/search?q={q}')\n"
+        "    link = 'https://cite.example.org/item/1'\n"
+        "    return [_result(title='t', url=link)]\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sources, "__file__", str(fake))
+    monkeypatch.setattr(sources, "SOURCES", {
+        "planted": {"hosts": ["cite.example.org", "query.example.net", "www.loc.gov"]},
+    })
+    # Hosts are matched as substrings of each literal, so the three are chosen
+    # not to contain one another — or the query host would also be "cited".
+    assert _roles_from_source() == {
+        "cite.example.org": {"citation"},
+        "query.example.net": {"query"},
+        "www.loc.gov": {"namespace"},
+    }
+
+
 def test_the_namespace_role_is_carried_where_the_code_shows_one():
     """`www.loc.gov` is declared by `gallica` and `ndl` purely as the SRW/Zing
     XML namespace URI. That is a schema identifier, not a server, and it is the
