@@ -35,3 +35,19 @@ a PR whose title would cut a release its commits would not.
 These rules are the fleet's, published by `willow-reconciler` as
 `reconciler conventions --json` and held to in `tests/test_fleet_conventions.py`,
 which reads them from `tests/fleet_conventions.json` rather than restating them.
+
+## The Idea-Id commit-trailer convention
+
+A commit that lands an idea recorded in docs/ideas.md carries an
+`Idea-Id: <corpus>-ideas-<num>` git trailer (add `Idea-Status: partial` when a
+commit only partly lands it). It is the durable join key willow-reconciler
+reads; a wrong id is worse than no id, so never type one by hand:
+
+    reconciler id --repo ./ --doc docs/ideas.md --grep "words from the item"
+    reconciler install-hook --repo ./       # derives it from a branch named idea-NN
+
+(`./`, not `.`: a `--repo` with no slash is read as a bare repo name, not a
+path, and `.` has none.)
+
+`.github/workflows/trailers.yml` runs `reconciler verify` on every PR and fails
+on a trailer that names an item the doc does not contain.
