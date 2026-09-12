@@ -20,6 +20,13 @@ the merge commit that swallowed it, so a shipped fix went undocumented. The
 tags and version numbers are unaffected either way — only the prose. Fixes go
 in a `docs:` commit, which is hidden and cuts no release of its own.
 
+## [0.14.1](https://github.com/hornbook-knowledge/Jeles/compare/v0.14.0...v0.14.1) (2026-09-12)
+
+
+### Fixed
+
+* **sources:** log a failed URL without its query string ([f01b63f](https://github.com/hornbook-knowledge/Jeles/commit/f01b63f48663371bd71729a7a934726d70bcaad1))
+
 ## [0.14.0](https://github.com/hornbook-knowledge/Jeles/compare/v0.13.0...v0.14.0) (2026-09-02)
 
 
