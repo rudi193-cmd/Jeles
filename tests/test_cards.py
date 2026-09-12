@@ -140,10 +140,15 @@ def test_the_string_walk_catches_plain_and_f_string_literals():
         "    b = f'https://fmt.example.org/{x}'\n"
         "    return g('nested.example.org', a, b)\n"
     )
-    found = _strings(tree)
-    assert "https://plain.example.org/item" in found
-    assert "https://fmt.example.org/" in found, "f-string constant prefix lost"
-    assert "nested.example.org" in found
+    # Set equality, not `"https://…" in found`: CodeQL reads a URL literal on
+    # the left of `in` as an incomplete URL sanitization (py/incomplete-url-
+    # substring-sanitization, high) and turned the PR red for it. Equality is
+    # the stronger assertion anyway — nothing else may be in the walk.
+    assert set(_strings(tree)) == {
+        "https://plain.example.org/item",
+        "https://fmt.example.org/",      # the f-string's constant prefix
+        "nested.example.org",
+    }
 
 
 def test_the_role_derivation_catches_each_planted_role(tmp_path, monkeypatch):
