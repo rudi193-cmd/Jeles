@@ -2,7 +2,18 @@
 
 Date: 2026-08-02
 Branch: `claude/world-meltdown-investigation-pjhwe8`
-Status: **proposed** — steps 1 and 2 not yet executed.
+Status: **landed** (closed 2026-09-12). Steps 1 and 2 both shipped: the `mcp`
+pin is `>=2.0.0,<3.0.0` (matches willow-mcp), `release.yml`, `release-please.yml`
+and `pr-title.yml` exist and are enforced, and the repo has published nine
+minor releases since, currently `v0.14.0` on PyPI. Step 3 (the layering
+decision) is still open and out of this closure's scope. Evidence:
+`pyproject.toml`'s `[project.optional-dependencies]`, the three workflow files
+named above, `git tag` (22 tags, `v0.1.0` … `v0.14.0`), and
+`git log --merges --format=%s | grep -i "pypi\|release\|mcp"` (PR #6 `build:
+zero-dependency base package, tag-derived version, release workflow`, PR #7
+`feat: port corpus_server to MCP SDK 2.0, and give it tests`, PR #9 `ci:
+automate releases with release-please`, PR #26 `ci: stop a PR title from
+cutting a release its commits would not`).
 
 The goal: get standalone Jeles built, published, and consumed by willow-mcp as a
 PyPI dependency the same way `kartikeya` already is — and then get the verified
@@ -22,6 +33,7 @@ Measured on 2026-08-02 against a clean venv, not assumed:
 | `pytest` **with `mcp` uninstalled** | 53 passed in 0.62s |
 | PyPI name `jeles` | 404 — free |
 | PyPI `kartikeya` / `willow-mcp` | 200 / 200 — both published |
+| `pytest` (2026-09-12, `v0.14.0`, `pip install -e ".[dev]"`) | 637 passed, 0 skipped |
 
 The package half is in better shape than expected. Two blockers stand between
 it and being consumable.
@@ -33,16 +45,33 @@ jeles       mcp>=1.6.0,<2.0.0     (resolves 1.29.0)
 willow-mcp  mcp>=2.0.0,<3.0.0
 ```
 
-The ranges are disjoint. `pip install willow-mcp jeles` cannot resolve, so
+~~The ranges are disjoint. `pip install willow-mcp jeles` cannot resolve, so
 willow-mcp cannot take jeles as a dependency today. This is a resolver error,
-not a design objection.
+not a design objection.~~
+
+**Closed 2026-09-12.** `pyproject.toml`'s `[project.optional-dependencies]`
+now reads `mcp = ["mcp>=2.0.0,<3.0.0"]` — the same floor willow-mcp requires,
+so the two co-install. Landed in PR #7 (`b8486a5`, 2026-08-02, "feat: port
+corpus_server to MCP SDK 2.0, and give it tests"), which also ported
+`corpus_server.py` off `mcp.server.fastmcp` (removed in SDK 2.0) onto
+`mcp.server.mcpserver.MCPServer`.
 
 ### Blocker B — no release path
 
-`.github/workflows/` holds `tests.yml` and `dependabot-automerge.yml` only.
+~~`.github/workflows/` holds `tests.yml` and `dependabot-automerge.yml` only.
 Nothing tags, builds, or ships. Release metadata (`readme`, `authors`,
 `keywords`, `classifiers`, `urls`) is also absent, so the PyPI landing page
-would render blank.
+would render blank.~~
+
+**Closed 2026-09-12.** Release metadata (`readme`, `authors`, `keywords`,
+`classifiers`, `[project.urls]`) is in `pyproject.toml`; `release.yml`,
+`release-please.yml`, and `pr-title.yml` all exist under `.github/workflows/`
+and are enforced. Landed in PR #6 (`f0fb73e`, 2026-08-02, "build:
+zero-dependency base package, tag-derived version, release workflow") and
+PR #9 (`0e7fa76`, 2026-08-03, "ci: automate releases with release-please"),
+with the title/commit-type guard added by PR #26 (`f5d7496`, 2026-08-03, "ci:
+stop a PR title from cutting a release its commits would not"). The repo is
+tagged through `v0.14.0` on PyPI, 22 tags since `v0.1.0`.
 
 ### The shape of the fix
 
