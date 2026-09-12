@@ -58,4 +58,4 @@ the source (a doc, a PR body, a design section) on an open one.
 
 16. ✅ **shipped**: keep this numbered idea pile at `docs/ideas.md`, in the reconciler's form and validated by `reconciler run --validate` (E3-piles). Landed by the commit that added this file, which carries the trailer for this item.
 
-17. adopt `Idea-Id` commit trailers (fleet CONVENTION, decision-2026-09-11): `.github/workflows/trailers.yml` runs `reconciler verify` on every PR and push to master, CONTRIBUTING.md documents how to generate a trailer rather than type one, and `tests/test_fleet_conventions.py` requires the gate wherever the pile exists (E3-trailers).
+17. ✅ **shipped**: adopt `Idea-Id` commit trailers (fleet CONVENTION, decision-2026-09-11): `.github/workflows/trailers.yml` runs `reconciler verify` on every PR and push to master, CONTRIBUTING.md documents how to generate a trailer rather than type one, and `tests/test_fleet_conventions.py` requires the gate wherever the pile exists (E3-trailers). Landed by the commit that added the workflow, which carries the trailer for this item.

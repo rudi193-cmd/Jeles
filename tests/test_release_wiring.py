@@ -83,6 +83,42 @@ def _names_a_non_suppressed_credential(value: object) -> bool:
     return any(c in text for c in NON_SUPPRESSED_CREDENTIALS)
 
 
+_PILE = "docs/ideas.md"
+_TRAILERS_WF = ".github/workflows/trailers.yml"
+
+
+def _pile_without_its_gate(root: Path) -> bool:
+    """True when `root` keeps a numbered idea pile but no trailers workflow —
+    the one state the fleet convention forbids. A pile with no
+    `reconciler verify` gate lets a mistyped `Idea-Id` trailer sit in history
+    as the strongest landing evidence the classifier has (rule 2a), and
+    nothing else can tell a real id from a dead one."""
+    return (root / _PILE).exists() and not (root / _TRAILERS_WF).exists()
+
+
+def test_the_trailers_gate_exists_wherever_the_pile_does():
+    """This repo keeps `docs/ideas.md` (fleet plan Wave 3, E3-piles), so
+    `.github/workflows/trailers.yml` must exist beside it (E3-trailers)."""
+    assert (_REPO / _PILE).exists(), "the pile moved? update _PILE"
+    assert not _pile_without_its_gate(_REPO)
+
+
+def test_the_pile_gate_check_catches_a_planted_pile_with_no_workflow(tmp_path):
+    """Planted: a tree with the pile and no workflow must be reported; the
+    same tree with the workflow added, and a tree with neither, must not."""
+    (tmp_path / "docs").mkdir()
+    (tmp_path / _PILE).write_text("1. planted\n", encoding="utf-8")
+    assert _pile_without_its_gate(tmp_path)
+
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+    (tmp_path / _TRAILERS_WF).write_text("name: Trailers\n", encoding="utf-8")
+    assert not _pile_without_its_gate(tmp_path)
+
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    assert not _pile_without_its_gate(bare)
+
+
 def test_the_credential_scan_catches_a_planted_token_and_not_github_token():
     """Planted, both ways. The scan must see either accepted credential inside
     the expression a workflow would actually write, and must *not* be satisfied

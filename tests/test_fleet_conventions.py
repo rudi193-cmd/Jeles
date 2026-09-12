@@ -34,10 +34,11 @@ version it names, never by editing the JSON.
   all before this file, so the rule had nothing to read; CONTRIBUTING.md now
   names the command CI's no-extras job runs, and `TEST_COMMAND` here is that
   exact string.
-* `required_when_pile_exists`: this repo keeps no numbered pile (no `IDEAS.md`,
-  no `docs/ideas.md`), so the trailers-workflow rule is vacuous here. The test
-  says so rather than pretending to check it; the day a pile is added, the
-  rule wakes up and `.github/workflows/trailers.yml` becomes required.
+* `required_when_pile_exists`: this repo keeps a numbered pile at
+  `docs/ideas.md` (fleet plan Wave 3, E3-piles), so `.github/workflows/
+  trailers.yml` is required and exists (E3-trailers). Before the pile existed
+  this rule was vacuous here and the test said so; it now checks the real
+  requirement.
 
 Every real-tree check below has a planted twin that runs the same helper
 against a synthetic tree or document carrying the violation, so a helper that
@@ -64,10 +65,8 @@ RULES: dict = json.loads(DOCUMENT.read_text(encoding="utf-8"))
 RELEASE_PLEASE = ".github/workflows/release-please.yml"
 RELEASE_CONFIG = "release-please-config.json"
 CONTRIBUTING = "CONTRIBUTING.md"
-#: Where the fleet keeps a numbered pile when a repo has one. This repo does
-#: not — see the module docstring — so the rule keyed on it is vacuous here.
+#: The numbered idea pile `reconciler run --repo ./ --doc docs/ideas.md` reads.
 PILE = "docs/ideas.md"
-PILE_CANDIDATES = ("IDEAS.md", "docs/ideas.md")
 ARMS_AUTOMERGE = "gh pr merge --auto"
 #: The exact command CONTRIBUTING.md names — CI's no-extras job, verbatim.
 TEST_COMMAND = "python -m pytest tests/ -q"
@@ -176,16 +175,12 @@ def test_contributing_names_the_test_command():
     assert _names_test_command(contributing.read_text(encoding="utf-8"))
 
 
-def test_the_trailers_rule_is_vacuous_here_because_there_is_no_pile():
-    """`required_when_pile_exists` names `.github/workflows/trailers.yml`. This
-    repo keeps no numbered pile, so nothing is required — stated, not
-    skipped: if a pile ever appears under either fleet name, this test fails
-    and the rule below it takes over."""
-    present = [p for p in PILE_CANDIDATES if (REPO_ROOT / p).exists()]
-    assert present == [], (
-        f"a pile now exists at {present}: set PILE to it and require "
-        f"{RULES['required_when_pile_exists']} (E3-trailers)"
-    )
+def test_trailers_workflow_is_present_because_a_pile_exists():
+    """`required_when_pile_exists` names `.github/workflows/trailers.yml`: a
+    repo with a numbered pile runs `reconciler verify` in CI, because rule 2a
+    asserts LANDED from a trailer ahead of every other signal and a dangling
+    one is worse than none. This repo has the pile, so the gate is required."""
+    assert (REPO_ROOT / PILE).exists(), "the pile moved? update PILE"
     assert _missing_when_pile_exists(REPO_ROOT, RULES["required_when_pile_exists"]) == []
 
 
