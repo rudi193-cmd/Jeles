@@ -512,7 +512,7 @@ def test_the_documented_source_count_matches_the_registry():
     default = sum(1 for c in inst.sources.SOURCES.values() if not c.get("opt_in"))
     assert (registered, default) == (65, 61)
 
-    readme = (Path(__file__).parent.parent / "README.md").read_text()
+    readme = (Path(__file__).parent.parent / "README.md").read_text(encoding="utf-8")
     assert f"{registered} registered source functions" in readme
     assert f"{default} of them in the default fan-out" in readme
     # Not `"~65" not in readme`: that pinned one drifted spelling, and the

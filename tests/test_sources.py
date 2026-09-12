@@ -568,7 +568,7 @@ def test_no_source_function_opens_or_reads_a_response_itself():
     import pathlib
 
     egress = {"_fetch", "_get", "_get_html", "_read_capped", "_urlopen"}
-    tree = ast.parse(pathlib.Path(sources.__file__).read_text())
+    tree = ast.parse(pathlib.Path(sources.__file__).read_text(encoding="utf-8"))
     offenders = []
     for fn in ast.walk(tree):
         if not isinstance(fn, ast.FunctionDef) or fn.name in egress:
@@ -762,7 +762,7 @@ def test_the_module_never_reaches_for_requests():
     fell back to urllib, which also meant a failed request was issued twice."""
     import pathlib
 
-    assert "import requests" not in pathlib.Path(sources.__file__).read_text()
+    assert "import requests" not in pathlib.Path(sources.__file__).read_text(encoding="utf-8")
 
 
 # ── Unreachable is not empty ────────────────────────────────────────────────
@@ -1210,7 +1210,7 @@ def test_the_module_defines_no_function_the_registry_does_not_use():
     from pathlib import Path
 
     defined = set(
-        _re.findall(r"^def (search_[a-z0-9_]+)", Path(sources.__file__).read_text(), _re.M)
+        _re.findall(r"^def (search_[a-z0-9_]+)", Path(sources.__file__).read_text(encoding="utf-8"), _re.M)
     )
     registered = {cfg.get("fn_name") or f"search_{sid}" for sid, cfg in sources.SOURCES.items()}
     assert defined - registered == set(), "defined but unreachable — register it or delete it"

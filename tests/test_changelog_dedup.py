@@ -117,7 +117,7 @@ def test_the_hidden_types_in_that_range_stay_out():
 def test_the_repo_changelog_is_already_correct():
     """Idempotence against the real file. A failure means either the changelog
     drifted or a release landed without the workflow step running."""
-    text = (_REPO / "CHANGELOG.md").read_text()
+    text = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     try:
         _, summary = changelog_dedup.rebuild(text)
     except changelog_dedup.Bail as exc:
@@ -182,7 +182,7 @@ def test_print_section_emits_exactly_what_a_release_body_should_be():
 
     The shape matters: release-please's body starts with the `## [x.y.z](…)`
     header, so the extracted section must include it."""
-    text = (_REPO / "CHANGELOG.md").read_text()
+    text = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     section = changelog_dedup.section_for(text, "0.5.0")
     assert section is not None
     assert section.splitlines()[0].startswith("## [0.5.0]("), section.splitlines()[0]
@@ -195,7 +195,7 @@ def test_print_section_emits_exactly_what_a_release_body_should_be():
 
 def test_print_section_is_none_for_an_unknown_version():
     """The workflow warns and leaves the release alone rather than blanking it."""
-    text = (_REPO / "CHANGELOG.md").read_text()
+    text = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     assert changelog_dedup.section_for(text, "99.99.99") is None
 
 

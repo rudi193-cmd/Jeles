@@ -237,7 +237,7 @@ def test_no_module_opens_a_url_outside_this_one():
     for path in sorted(root.rglob("*.py")):
         if path.name == "_egress.py":
             continue
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue

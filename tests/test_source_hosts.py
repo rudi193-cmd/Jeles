@@ -30,7 +30,7 @@ from urllib.parse import urlparse
 
 from jeles import sources
 
-_SRC = Path(sources.__file__).read_text()
+_SRC = Path(sources.__file__).read_text(encoding="utf-8")
 _TREE = ast.parse(_SRC)
 _URL_RE = re.compile(r"https?://[^\s\"'<>{}\\]+")
 _FUNCS = {n.name: n for n in ast.walk(_TREE) if isinstance(n, ast.FunctionDef)}

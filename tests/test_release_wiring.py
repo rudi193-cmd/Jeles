@@ -51,11 +51,11 @@ _RP_WF = _REPO / ".github" / "workflows" / "release-please.yml"
 
 
 def _json(path: Path) -> dict:
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _yaml(path: Path) -> dict:
-    return yaml.safe_load(path.read_text())
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
 def _package_config() -> dict:
@@ -164,7 +164,7 @@ def test_the_version_has_exactly_one_source():
     what makes that true, and a literal `version =` in pyproject or a hardcoded
     `__version__` in the package would quietly become a second copy to drift.
     """
-    pyproject = tomllib.loads((_REPO / "pyproject.toml").read_text())
+    pyproject = tomllib.loads((_REPO / "pyproject.toml").read_text(encoding="utf-8"))
     assert "version" in (pyproject["project"].get("dynamic") or []), (
         "project.version must stay dynamic — a literal is a second copy"
     )
@@ -181,7 +181,7 @@ def test_the_version_has_exactly_one_source():
     hardcoded = [
         f"{p.relative_to(_REPO)}:{i}"
         for p in (_REPO / "jeles").rglob("*.py")
-        for i, line in enumerate(p.read_text().splitlines(), 1)
+        for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
         if re.match(r"\s*__version__\s*=\s*[\"']", line)
     ]
     assert not hardcoded, f"hardcoded version string(s): {hardcoded}"
@@ -297,7 +297,7 @@ def test_the_pr_title_check_guards_both_directions():
     assert "src/willow_mcp" not in body, "willow-mcp's path leaked into this port"
 
     # And it really is what the wheel ships.
-    pyproject = tomllib.loads((_REPO / "pyproject.toml").read_text())
+    pyproject = tomllib.loads((_REPO / "pyproject.toml").read_text(encoding="utf-8"))
     assert pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["jeles"]
 
 
