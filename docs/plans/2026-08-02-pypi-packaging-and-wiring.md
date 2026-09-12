@@ -213,6 +213,10 @@ Two consequences worth naming:
 Carried from the session that produced this plan. Items 0a and 0b are context,
 not work items.
 
+*Carried into `docs/ideas.md` (items 1–10 there) on 2026-09-12; that file is
+the live pile and the one `reconciler` reads. This list is kept as the record
+of where each item came from.*
+
 - **0a.** The state of the human world. Named, not filed.
 - **0b.** Reach — Apache-2.0 is a bet that someone outside this workspace picks
   the software up. Licensing is done; the adoption path is the open part.
