@@ -167,14 +167,27 @@ def test_the_aggregate_gate_needs_every_job_runs_always_and_rejects_non_success(
     assert _gate_rejected_results(jobs) == _REJECTED
 
 
+def _names_codeql_home(workflow_text: str) -> bool:
+    """True when the workflow's own comments say CodeQL runs from default
+    setup — the sentence a tidy-up would otherwise delete first."""
+    return "default setup" in workflow_text and "CodeQL" in workflow_text
+
+
 def test_the_workflow_says_where_codeql_runs():
     """No CodeQL workflow file exists here on purpose — default setup runs it —
     and the reason has to stay written down where the next person looks."""
-    text = _WORKFLOW.read_text(encoding="utf-8")
-    assert "default setup" in text and "CodeQL" in text
+    assert _names_codeql_home(_WORKFLOW.read_text(encoding="utf-8"))
     assert not (_REPO / ".github" / "workflows" / "codeql.yml").exists(), (
         "a workflow-based CodeQL config conflicts with default setup; pick one"
     )
+
+
+def test_the_codeql_sentence_check_catches_a_planted_header_without_it():
+    """Planted: a header that mentions CodeQL but not where it runs, and one
+    that mentions neither, must both be reported."""
+    assert not _names_codeql_home("# CodeQL runs somewhere\njobs: {}\n")
+    assert not _names_codeql_home("# nothing about scanning\njobs: {}\n")
+    assert _names_codeql_home("# CodeQL runs from default setup here\njobs: {}\n")
 
 
 # ── the plants ───────────────────────────────────────────────────────────────
@@ -219,6 +232,9 @@ _FULL_GATE_IF = (
     "|| contains(needs.*.result, 'skipped') }}"
 )
 _ALL_JOBS = ["python-versions", "lint", "test-matrix", "windows"]
+_TOLERANT_GATE_IF = (
+    "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}"
+)
 
 
 def test_the_matrix_check_catches_a_planted_hardcoded_matrix():
@@ -289,7 +305,7 @@ def test_the_gate_check_catches_a_planted_gate_that_tolerates_skipped():
         _workflow(
             matrix=repr(_DERIVED_MATRIX),
             lint_install="pip install ruff==0.16.7 bandit",
-            gate_if="${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}",
+            gate_if=_TOLERANT_GATE_IF,
             gate_needs=_ALL_JOBS,
         )
     )

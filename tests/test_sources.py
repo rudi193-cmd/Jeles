@@ -1210,7 +1210,11 @@ def test_the_module_defines_no_function_the_registry_does_not_use():
     from pathlib import Path
 
     defined = set(
-        _re.findall(r"^def (search_[a-z0-9_]+)", Path(sources.__file__).read_text(encoding="utf-8"), _re.M)
+        _re.findall(
+            r"^def (search_[a-z0-9_]+)",
+            Path(sources.__file__).read_text(encoding="utf-8"),
+            _re.M,
+        )
     )
     registered = {cfg.get("fn_name") or f"search_{sid}" for sid, cfg in sources.SOURCES.items()}
     assert defined - registered == set(), "defined but unreachable — register it or delete it"
