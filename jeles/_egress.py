@@ -127,6 +127,22 @@ def _dialled_hosts(url: str) -> list[str] | None:
     return seen if parsed else None
 
 
+def loggable(url: str) -> str:
+    """The part of a URL that may be written to a log or an error message:
+    scheme, host and path, with userinfo, query and fragment dropped.
+
+    Sources carry their API keys in the query string (`&api_key=`, `?wskey=`),
+    and the failure paths used to quote a prefix of the URL — `url[:80]` in
+    `sources._get`, `url[:60]` in this module's refusals. For Europeana the key
+    begins at offset 53, so a prefix is not a redaction. Dropped rather than
+    masked: the host and path already say which source failed, and a masked
+    query would only invite someone to widen the window again.
+    """
+    parts = urllib.parse.urlsplit(url)
+    host = parts.netloc.rpartition("@")[2]
+    return urllib.parse.urlunsplit((parts.scheme, host, parts.path, "", ""))
+
+
 def _split_host(url: str) -> str | None:
     return urllib.parse.urlsplit(url).hostname
 
@@ -281,7 +297,8 @@ class SchemeGuardedRedirects(urllib.request.HTTPRedirectHandler):
             raise urllib.error.HTTPError(
                 newurl,
                 code,
-                f"refusing redirect to a scheme outside {sorted(self.allowed)}: {newurl[:60]!r}",
+                f"refusing redirect to a scheme outside {sorted(self.allowed)}: "
+                f"{loggable(newurl)!r}",
                 headers,
                 fp,
             )
@@ -291,7 +308,7 @@ class SchemeGuardedRedirects(urllib.request.HTTPRedirectHandler):
                 raise urllib.error.HTTPError(
                     newurl,
                     code,
-                    f"refusing redirect to a private destination — {reason}: {newurl[:60]!r}",
+                    f"refusing redirect to a private destination — {reason}: {loggable(newurl)!r}",
                     headers,
                     fp,
                 )
@@ -401,12 +418,12 @@ def check_url(url: str, allowed: frozenset[str], *, allow_private: bool = False)
     did not run. Both callers now share these lines rather than agreeing to.
     """
     if not scheme_ok(url, allowed):
-        raise ValueError(f"refusing URL scheme outside {sorted(allowed)}: {url[:60]!r}")
+        raise ValueError(f"refusing URL scheme outside {sorted(allowed)}: {loggable(url)!r}")
     if allow_private:
         return
     reason = private_destination(url)
     if reason is not None:
-        raise ValueError(f"refusing a private destination — {reason}: {url[:60]!r}")
+        raise ValueError(f"refusing a private destination — {reason}: {loggable(url)!r}")
 
 
 def urlopen(

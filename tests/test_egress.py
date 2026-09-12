@@ -51,6 +51,46 @@ def test_urlopen_refuses_a_disallowed_scheme_before_opening():
         )
 
 
+@pytest.mark.parametrize(
+    "url, kept",
+    [
+        (
+            "https://api.example.org/v2/search?api_key=planted-key&q=x",
+            "https://api.example.org/v2/search",
+        ),
+        (
+            "https://api.example.org/search.json?wskey=planted-key#frag",
+            "https://api.example.org/search.json",
+        ),
+        (
+            "https://user:planted-pw@api.example.org:8443/p?k=planted-key",
+            "https://api.example.org:8443/p",
+        ),
+        ("http://127.0.0.1:8888/search", "http://127.0.0.1:8888/search"),
+        ("file:///etc/passwd", "file:///etc/passwd"),
+    ],
+)
+def test_loggable_keeps_the_destination_and_drops_the_secrets(url, kept):
+    """What the failure paths quote: scheme, host and path. Query, fragment and
+    userinfo are where sources and operators put credentials, so none of them
+    survive — every string above named `planted` is the proof."""
+    out = _egress.loggable(url)
+    assert out == kept
+    assert "planted" not in out
+
+
+def test_a_refusal_message_quotes_the_url_without_its_query_string():
+    """The refusal used to quote `url[:60]`, which for a key at offset 53 is a
+    prefix of the key. The message still names the destination, so the reader
+    knows what was refused, and nothing after the `?`."""
+    url = "http://api.example.org/v2/search.json?api_key=planted-key&q=x"
+    with pytest.raises(ValueError, match=r"scheme outside \['https'\]") as info:
+        _egress.check_url(url, _egress.HTTPS_ONLY)
+    assert "http://api.example.org/v2/search.json" in str(info.value)
+    assert "planted" not in str(info.value)
+    assert "api_key" not in str(info.value)
+
+
 # ── The redirect hop, which is what all three modules were missing ──────────
 
 

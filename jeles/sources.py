@@ -271,7 +271,7 @@ def _get(url: str, headers: dict | None = None, timeout: float | None = None) ->
         # is exactly the kind of failure that used to read as "nothing here".
         # Re-noting a connect error already noted is harmless: same exception.
         _note_transport_failure(e)
-        log.warning("GET %s failed: %s", url[:80], e)
+        log.warning("GET %s failed: %s", _egress.loggable(url), e)
         return None
 
 
@@ -281,7 +281,7 @@ def _get_html(url: str, headers: dict | None = None, timeout: float | None = Non
         return _fetch(url, headers, timeout).decode("utf-8", errors="replace")
     except Exception as e:
         _note_transport_failure(e)  # same reason as `_get`: read counts too
-        log.warning("GET html %s failed: %s", url[:80], e)
+        log.warning("GET html %s failed: %s", _egress.loggable(url), e)
         return None
 
 

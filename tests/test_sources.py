@@ -587,6 +587,31 @@ def test_no_source_function_opens_or_reads_a_response_itself():
     assert not offenders, offenders
 
 
+def test_a_failed_fetch_is_logged_without_its_query_string(monkeypatch, caplog):
+    """`_get` and `_get_html` log the URL that failed, and sources carry their
+    API keys in the query string. The log line used to be `url[:80]`; for
+    Europeana the key begins at offset 53, so a failed call wrote most of it to
+    the log. A planted key must not reach the record — the host and path,
+    which say which source failed, must.
+    """
+    import logging
+
+    def refuse(url, headers=None, timeout=None):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(sources, "_fetch", refuse)
+    planted = "planted-not-a-real-key-0123456789"
+    url = "https://api.europeana.eu/record/v2/search.json?wskey=" + planted + "&query=x"
+    with caplog.at_level(logging.WARNING, logger=sources.log.name):
+        assert sources._get(url) is None
+        assert sources._get_html(url) is None
+    lines = [r.getMessage() for r in caplog.records if "failed" in r.getMessage()]
+    assert len(lines) == 2, caplog.text
+    assert planted not in caplog.text
+    assert all("https://api.europeana.eu/record/v2/search.json" in line for line in lines), lines
+    assert all("wskey" not in line and "query=" not in line for line in lines), lines
+
+
 def test_the_opener_refuses_a_non_http_scheme():
     """URLs are built from queries and API responses, so the scheme is
     enforced rather than assumed."""
