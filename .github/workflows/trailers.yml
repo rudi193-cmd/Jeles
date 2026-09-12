@@ -15,6 +15,12 @@ on:
   pull_request:
     branches: [master]
 
+# Read-only, like tests.yml: the job checks out and runs `reconciler verify`,
+# which only ever calls `git log`. Without this block the GITHUB_TOKEN gets
+# the repository's default grant, which CodeQL flagged on the first run.
+permissions:
+  contents: read
+
 jobs:
   verify-trailers:
     runs-on: ubuntu-latest
