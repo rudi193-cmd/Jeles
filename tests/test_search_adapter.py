@@ -8,6 +8,7 @@ import io
 import json
 import urllib.error
 import urllib.parse
+from urllib.parse import urlparse
 
 import pytest
 
@@ -321,7 +322,7 @@ def test_parse_ddg_html_unwraps_redirect_links_and_maps_snippets():
         "https://openpolicyagent.org/x",
         "https://osohq.com/b",
     ]
-    assert all("duckduckgo.com" not in h["url"] for h in hits)
+    assert all(urlparse(h["url"]).netloc != "duckduckgo.com" for h in hits)
     assert hits[0]["title"] == "OPA signed bundles"
     assert hits[0]["snippet"] == "a signed registry of reaction bundles"
 

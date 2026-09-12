@@ -20,6 +20,7 @@ import io
 import json
 import threading
 import time
+from urllib.parse import urlparse
 
 import pytest
 
@@ -433,7 +434,9 @@ def test_chronicling_america_parses_the_loc_collections_shape(monkeypatch):
 
     assert len(captured) == 1
     url, timeout = captured[0]
-    assert "chroniclingamerica.loc.gov" not in url, "the retired host must not be requested"
+    assert urlparse(url).netloc == "www.loc.gov", (
+        "the retired host chroniclingamerica.loc.gov must not be requested"
+    )
     assert url.startswith("https://www.loc.gov/collections/chronicling-america/")
     assert "fo=json" in url, "the collections API answers html without fo=json"
     assert timeout == 25, "the raised timeout is part of the fix, not decoration"
@@ -526,7 +529,7 @@ def test_arxiv_parses_xml_into_the_contract(monkeypatch):
     hits = sources.search_arxiv("policy", limit=1)
     assert hits and set(hits[0]) == CITATION_KEYS
     assert hits[0]["title"] == "Deterministic policy evaluation"
-    assert "arxiv.org" in hits[0]["url"]
+    assert urlparse(hits[0]["url"]).netloc == "arxiv.org"
 
 
 def test_a_keyed_source_is_skipped_without_its_key(monkeypatch):
