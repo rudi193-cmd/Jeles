@@ -28,6 +28,7 @@ whoever passes it there is making that decision themselves. It carries
 A draft is the bottom of the ladder by construction, which is what makes it
 safe to generate one automatically.
 """
+
 from __future__ import annotations
 
 import logging
@@ -111,8 +112,9 @@ def draft(
         return {"drafted": False, "reason": "no_evidence", "question": question}
 
     try:
-        raw = respond(_DRAFT_SYSTEM, [],
-                      f"QUESTION: {question}\n\nDOCUMENTS:\n{_evidence_block(usable)}")
+        raw = respond(
+            _DRAFT_SYSTEM, [], f"QUESTION: {question}\n\nDOCUMENTS:\n{_evidence_block(usable)}"
+        )
     except Exception as exc:
         log.warning("nugget draft failed: %s", exc)
         return {"drafted": False, "reason": "model_failed", "question": question}

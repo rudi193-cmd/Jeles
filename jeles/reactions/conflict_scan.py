@@ -43,6 +43,7 @@ import at module load — so importing this module, and running :func:`react`
 with a fake searcher, is fast and offline. That is the same purity seam
 :mod:`jeles.corpus` holds.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -83,12 +84,12 @@ def frame_queries(claim: str, *, extra: list[str] | None = None) -> list[str]:
     if not claim:
         return []
     queries = [
-        f"{claim} existing implementation library",   # mirror (baseline)
-        f"{claim} alternative that supersedes",        # supersession
-        f"{claim} vs prior art comparison",            # rivalry
-        f"{claim} limitations criticism why not",      # refutation
+        f"{claim} existing implementation library",  # mirror (baseline)
+        f"{claim} alternative that supersedes",  # supersession
+        f"{claim} vs prior art comparison",  # rivalry
+        f"{claim} limitations criticism why not",  # refutation
     ]
-    for q in (extra or []):
+    for q in extra or []:
         q = (q or "").strip()
         if q and q not in queries:
             queries.append(q)
@@ -106,12 +107,32 @@ def frame_queries(claim: str, *, extra: list[str] | None = None) -> list[str]:
 #:
 #: Shorteners are excluded because they are opaque — two of them can point at
 #: one page, which is the exact opposite of independence.
-_NON_WITNESS = frozenset({
-    "duckduckgo.com", "google.com", "bing.com", "yahoo.com", "baidu.com",
-    "yandex.com", "search.brave.com", "ecosia.org", "startpage.com",
-    "bit.ly", "t.co", "tinyurl.com", "goo.gl", "ow.ly", "buff.ly",
-    "is.gd", "rebrand.ly", "cutt.ly", "shorturl.at", "lnkd.in", "dlvr.it",
-})
+_NON_WITNESS = frozenset(
+    {
+        "duckduckgo.com",
+        "google.com",
+        "bing.com",
+        "yahoo.com",
+        "baidu.com",
+        "yandex.com",
+        "search.brave.com",
+        "ecosia.org",
+        "startpage.com",
+        "bit.ly",
+        "t.co",
+        "tinyurl.com",
+        "goo.gl",
+        "ow.ly",
+        "buff.ly",
+        "is.gd",
+        "rebrand.ly",
+        "cutt.ly",
+        "shorturl.at",
+        "lnkd.in",
+        "dlvr.it",
+    }
+)
+
 
 def _witnesses(hits: list[dict[str, Any]], claim: str) -> list[dict[str, Any]]:
     """The hits that may actually count toward corroboration.
@@ -171,13 +192,15 @@ def _gather(queries: list[str], searcher: Searcher, max_results: int) -> list[di
             if not url or url in seen:
                 continue
             seen.add(url)
-            hits.append({
-                "title": str(r.get("title") or "").strip(),
-                "url": url,
-                "snippet": str(r.get("snippet") or "").strip(),
-                "domain": _domain(url),
-                "query": q,
-            })
+            hits.append(
+                {
+                    "title": str(r.get("title") or "").strip(),
+                    "url": url,
+                    "snippet": str(r.get("snippet") or "").strip(),
+                    "domain": _domain(url),
+                    "query": q,
+                }
+            )
     return hits
 
 
@@ -229,43 +252,49 @@ def react(
             f"Superseding / prior work exists — treat the design's overlap here "
             f"as bought, not novel. Human-verify the sources before sealing."
         )
-        proposals.append({
-            "driver": "put_nugget",
-            "reason": f"{len(domains)} independent domains corroborate prior art",
-            "args": {
-                "question": f"Prior-art / conflict scan: {claim}",
-                "answer": answer,
-                "sources": sources,
-                "verified_by": WITNESS,
-                # Machine corroboration, not a human check — the driver stamps
-                # this so the nugget can't render as human-verified (corpus B6).
-                "verification_kind": "machine",
-                "tags": tags,
-            },
-        })
+        proposals.append(
+            {
+                "driver": "put_nugget",
+                "reason": f"{len(domains)} independent domains corroborate prior art",
+                "args": {
+                    "question": f"Prior-art / conflict scan: {claim}",
+                    "answer": answer,
+                    "sources": sources,
+                    "verified_by": WITNESS,
+                    # Machine corroboration, not a human check — the driver stamps
+                    # this so the nugget can't render as human-verified (corpus B6).
+                    "verification_kind": "machine",
+                    "tags": tags,
+                },
+            }
+        )
     else:
-        proposals.append({
-            "driver": "log_gap",
-            "reason": (
-                f"contested — {len(domains)} independent source(s), "
-                f"below the {min_sources}-source bar"
-            ),
-            "args": {"question": f"Prior-art / conflict scan: {claim}"},
-        })
+        proposals.append(
+            {
+                "driver": "log_gap",
+                "reason": (
+                    f"contested — {len(domains)} independent source(s), "
+                    f"below the {min_sources}-source bar"
+                ),
+                "args": {"question": f"Prior-art / conflict scan: {claim}"},
+            }
+        )
 
-    proposals.append({
-        "driver": "frank_append",
-        "reason": "legibility — every reaction leaves one line",
-        "args": {
-            "kind": "conflict_scan",
-            "claim": claim,
-            "event_kind": str(event.get("kind") or ""),
-            "surface": str(event.get("surface") or ""),
-            "corroborated": corroborated,
-            "sources": sources,
-            "domains": domains,
-        },
-    })
+    proposals.append(
+        {
+            "driver": "frank_append",
+            "reason": "legibility — every reaction leaves one line",
+            "args": {
+                "kind": "conflict_scan",
+                "claim": claim,
+                "event_kind": str(event.get("kind") or ""),
+                "surface": str(event.get("surface") or ""),
+                "corroborated": corroborated,
+                "sources": sources,
+                "domains": domains,
+            },
+        }
+    )
     return proposals
 
 
@@ -323,8 +352,11 @@ def _vet(driver: str, args: Any) -> tuple[dict[str, Any], dict[str, Any] | None]
     a *list*: one bad proposal must not take the good ones with it.
     """
     if not isinstance(args, dict):
-        return {}, {"error": "proposal_args_refused", "driver": driver,
-                    "detail": f"args must be a mapping, got {type(args).__name__}"}
+        return {}, {
+            "error": "proposal_args_refused",
+            "driver": driver,
+            "detail": f"args must be a mapping, got {type(args).__name__}",
+        }
 
     allowed = _ALLOWED_ARGS[driver]
     vetted = {k: v for k, v in args.items() if k in allowed}
@@ -354,22 +386,31 @@ def _vet(driver: str, args: Any) -> tuple[dict[str, Any], dict[str, Any] | None]
         vetted["verification_kind"] = PROPOSAL_VERIFICATION_KIND
 
     if rejected:
-        detail = (f"{driver} accepts only {sorted(allowed)} from a proposal; "
-                  f"refused {rejected}")
+        detail = f"{driver} accepts only {sorted(allowed)} from a proposal; refused {rejected}"
         if "nugget_id" in rejected:
             # Named separately because it is not a typo, it is the overwrite
             # path: an id turns a new-nugget write into a write on top of an
             # existing record, keeping its place in every search result.
-            detail += (". nugget_id is not reachable from a proposal — a "
-                       "reaction may add a nugget, never replace one by id.")
-        return {}, {"error": "proposal_args_refused", "driver": driver,
-                    "rejected": rejected, "allowed": sorted(allowed), "detail": detail}
+            detail += (
+                ". nugget_id is not reachable from a proposal — a "
+                "reaction may add a nugget, never replace one by id."
+            )
+        return {}, {
+            "error": "proposal_args_refused",
+            "driver": driver,
+            "rejected": rejected,
+            "allowed": sorted(allowed),
+            "detail": detail,
+        }
 
     missing = sorted(_REQUIRED_ARGS[driver] - set(vetted))
     if missing:
-        return {}, {"error": "proposal_args_incomplete", "driver": driver,
-                    "missing": missing,
-                    "detail": f"{driver} requires {missing}"}
+        return {}, {
+            "error": "proposal_args_incomplete",
+            "driver": driver,
+            "missing": missing,
+            "detail": f"{driver} requires {missing}",
+        }
     return vetted, None
 
 
@@ -394,6 +435,7 @@ def apply(
     """
     if put_nugget is None or log_gap is None:
         from .. import corpus
+
         put_nugget = put_nugget or corpus.put_nugget
         log_gap = log_gap or corpus.log_gap
 

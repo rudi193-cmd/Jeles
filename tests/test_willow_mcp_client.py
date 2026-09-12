@@ -189,8 +189,10 @@ def test_launch_prefers_explicit_override(monkeypatch):
 def test_launch_falls_back_to_path_binary(monkeypatch):
     monkeypatch.delenv("WILLOW_MCP_CMD", raising=False)
     monkeypatch.setattr(
-        wmc.shutil, "which",
-        lambda name: "/usr/local/bin/willow-mcp" if name == "willow-mcp" else None)
+        wmc.shutil,
+        "which",
+        lambda name: "/usr/local/bin/willow-mcp" if name == "willow-mcp" else None,
+    )
     assert wmc._launch() == ("/usr/local/bin/willow-mcp", [])
 
 
@@ -340,8 +342,9 @@ def test_retries_do_not_accumulate_event_loops(monkeypatch, attempts, no_willow_
         assert wmc.ensure_started(timeout=1) is False
 
     assert len(attempts) == 26
-    assert _wait_until(lambda: all(loop.is_closed() for loop in attempts)), \
+    assert _wait_until(lambda: all(loop.is_closed() for loop in attempts)), (
         "a retry left its event loop open"
+    )
     if countable:
         # Allow a little slack for unrelated churn; the bug was +3/retry.
         assert len(os.listdir(fd_dir)) - before < 10
@@ -361,10 +364,12 @@ def test_shutdown_is_safe_after_the_session_ended(fake_willow):
 # successful forward at every surface a caller could reach. It stays
 # non-raising; it no longer stays silent.
 
+
 def test_forward_status_records_a_failed_forward(no_willow_mcp):
     wmc.forward_gap("Which seat is this host forwarding as?")
-    assert _wait_until(lambda: wmc.last_forward_error() is not None), \
+    assert _wait_until(lambda: wmc.last_forward_error() is not None), (
         "a failed forward left no trace"
+    )
 
     status = wmc.forward_status()
     assert status["failed"] == 1
@@ -375,8 +380,7 @@ def test_forward_status_records_a_failed_forward(no_willow_mcp):
 
 def test_forward_status_records_a_successful_forward(monkeypatch):
     calls = []
-    monkeypatch.setattr(wmc, "call_tool",
-                        lambda name, inputs, **kw: calls.append((name, inputs)))
+    monkeypatch.setattr(wmc, "call_tool", lambda name, inputs, **kw: calls.append((name, inputs)))
 
     wmc.forward_gap("Did this one land?", topic="t")
     assert _wait_until(lambda: wmc.forward_status()["forwarded"] == 1)
@@ -400,8 +404,9 @@ def test_a_recovered_forward_clears_the_previous_error(monkeypatch):
 
     wmc.forward_gap("second")
     assert _wait_until(lambda: wmc.forward_status()["forwarded"] == 1)
-    assert wmc.last_forward_error() is None, \
+    assert wmc.last_forward_error() is None, (
         "a later success must not leave a stale error on the status"
+    )
 
 
 def test_forward_gap_still_never_raises_into_its_caller(no_willow_mcp):
@@ -438,6 +443,7 @@ def test_repeated_identical_failures_warn_once(no_willow_mcp, caplog):
 # landed. Found by a cross-repo seam check reporting "no error reported" beside
 # a gate denial in the server's own log.
 
+
 class _Result:
     """Minimal stand-in for an MCP CallToolResult."""
 
@@ -447,8 +453,10 @@ class _Result:
 
 
 def test_gate_denial_in_the_payload_raises():
-    denial = ("gate denied: 'jeles' not permitted for 'gap_log'. Ensure a manifest "
-              "exists at $WILLOW_HOME/mcp_apps/jeles/manifest.json")
+    denial = (
+        "gate denied: 'jeles' not permitted for 'gap_log'. Ensure a manifest "
+        "exists at $WILLOW_HOME/mcp_apps/jeles/manifest.json"
+    )
     with pytest.raises(RuntimeError, match="not permitted for 'gap_log'"):
         wmc._parse_tool_payload(_Result(json.dumps({"error": denial})))
 
@@ -490,8 +498,9 @@ def test_a_denied_forward_reaches_forward_status(monkeypatch):
     monkeypatch.setattr(wmc, "_mcp_loop", loop)
     try:
         wmc.forward_gap("what does the fleet not know?")
-        assert _wait_until(lambda: wmc.last_forward_error() is not None), \
+        assert _wait_until(lambda: wmc.last_forward_error() is not None), (
             "a gate denial was recorded as a successful forward"
+        )
         status = wmc.forward_status()
         assert status["failed"] == 1
         assert status["forwarded"] == 0

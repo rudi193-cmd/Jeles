@@ -19,6 +19,7 @@ running this suite (it is, via the `dev` extra's `jeles[nestor]` — see
 pyproject.toml — everywhere except the `no-extras` CI leg, where it already
 isn't).
 """
+
 from __future__ import annotations
 
 import sys
@@ -50,30 +51,32 @@ def test_refuses_when_evidence_is_not_a_dict():
 
 def test_refuses_an_unrecognised_scheme():
     ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a.", "rita", {"scheme": "trust-me", "seal_sig": "deadbeef"})
+        "q?", "a.", "rita", {"scheme": "trust-me", "seal_sig": "deadbeef"}
+    )
     assert ok is False
     assert "scheme" in reason
 
 
 def test_refuses_a_missing_seal_sig():
     ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a.", "rita", {"scheme": _nestor_seal.EVIDENCE_SCHEME})
+        "q?", "a.", "rita", {"scheme": _nestor_seal.EVIDENCE_SCHEME}
+    )
     assert ok is False
     assert "seal_sig" in reason
 
 
 def test_refuses_an_empty_seal_sig():
     ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a.", "rita",
-        {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": ""})
+        "q?", "a.", "rita", {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": ""}
+    )
     assert ok is False
     assert "seal_sig" in reason
 
 
 def test_refuses_a_non_string_seal_sig():
     ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a.", "rita",
-        {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": 12345})
+        "q?", "a.", "rita", {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": 12345}
+    )
     assert ok is False
     assert "seal_sig" in reason
 
@@ -87,8 +90,8 @@ def test_refuses_when_the_nestor_extra_is_not_installed(no_nestor):
     evidence dict, still cannot mint `human` without a real signature — and
     "the verifier can't even check" must mean refuse, not trust."""
     ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a.", "rita",
-        {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": "not-checkable"})
+        "q?", "a.", "rita", {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": "not-checkable"}
+    )
     assert ok is False
     assert "nestor extra not installed" in reason
 
@@ -106,8 +109,8 @@ def _reason_a_write_would_give():
     """What `verify_human_write` refuses with in this environment, given
     evidence shaped well enough to get past the shape checks."""
     ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a.", "rita",
-        {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": "deadbeef"})
+        "q?", "a.", "rita", {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": "deadbeef"}
+    )
     assert ok is False
     return reason
 
@@ -133,7 +136,8 @@ def test_describe_reports_an_unconfigured_instance_exactly_as_a_write_would(monk
         monkeypatch,
         signing_enabled=lambda: False,
         seal_is_valid=lambda *a, **k: pytest.fail(
-            "an unconfigured instance must be refused before seal_is_valid"),
+            "an unconfigured instance must be refused before seal_is_valid"
+        ),
     )
     described = _nestor_seal.describe()
     assert described["installed"] is True
@@ -159,6 +163,7 @@ def test_describe_is_ready_only_when_something_could_be_checked(monkeypatch):
 
 def test_describe_reports_a_failing_check_rather_than_raising(monkeypatch):
     """A caller asking only for a status must not be handed an exception."""
+
     def _boom():
         raise RuntimeError("keyring unreadable")
 

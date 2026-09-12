@@ -49,6 +49,7 @@ def __getattr__(name: str) -> Any:
             return "0.0.0+unknown"
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
+
 _PERSONA_PATH = Path(__file__).resolve().parent / "persona" / "jeles_persona.json"
 
 

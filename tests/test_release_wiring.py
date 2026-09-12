@@ -23,6 +23,7 @@ not have, and jeles has no second version file to keep in step because nothing
 here stores a version at all. Getting those backwards is exactly the
 copy-paste failure the willow-mcp version was written after.
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -61,7 +62,6 @@ def _package_config() -> dict:
     return _json(_CONFIG)["packages"]["."]
 
 
-
 # A credential whose events actually trigger workflows. Either form is
 # acceptable; what is NOT acceptable is GITHUB_TOKEN, whose events GitHub
 # suppresses — the release PR merges, no tag workflow fires, nothing publishes.
@@ -73,8 +73,8 @@ def _package_config() -> dict:
 # unchanged — that is the half that guards the failure jeles paid three
 # releases for.
 NON_SUPPRESSED_CREDENTIALS = (
-    "RELEASE_PLEASE_TOKEN",              # fine-grained PAT (being retired)
-    "steps.app-token.outputs.token",     # willow-ci App installation token
+    "RELEASE_PLEASE_TOKEN",  # fine-grained PAT (being retired)
+    "steps.app-token.outputs.token",  # willow-ci App installation token
 )
 
 
@@ -165,15 +165,18 @@ def test_the_version_has_exactly_one_source():
     `__version__` in the package would quietly become a second copy to drift.
     """
     pyproject = tomllib.loads((_REPO / "pyproject.toml").read_text())
-    assert "version" in (pyproject["project"].get("dynamic") or []), \
+    assert "version" in (pyproject["project"].get("dynamic") or []), (
         "project.version must stay dynamic — a literal is a second copy"
-    assert "version" not in pyproject["project"], \
+    )
+    assert "version" not in pyproject["project"], (
         "a literal project.version defeats the tag-derived scheme"
+    )
     assert pyproject["tool"]["hatch"]["version"]["source"] == "vcs"
 
     # No `extra-files` either: there is nothing for release-please to bump.
-    assert not _package_config().get("extra-files"), \
+    assert not _package_config().get("extra-files"), (
         "nothing in this repo stores a version, so nothing needs bumping"
+    )
 
     hardcoded = [
         f"{p.relative_to(_REPO)}:{i}"
@@ -195,8 +198,9 @@ def test_release_automation_uses_the_pat_everywhere():
     used: set[str] = set()
     values: list[str] = []
     for step in steps:
-        for value in list((step.get("env") or {}).values()) + \
-                     list((step.get("with") or {}).values()):
+        for value in list((step.get("env") or {}).values()) + list(
+            (step.get("with") or {}).values()
+        ):
             values.append(str(value))
             used.update(re.findall(r"secrets\.([A-Z_]+)", str(value)))
 
@@ -237,13 +241,16 @@ def test_the_changelog_is_rebuilt_before_auto_merge_is_armed():
         assert hits, f"no step matching {needle!r} in {names}"
         return hits[0]
 
-    assert (index_of("actions/checkout") < index_of("release-please-action")
-            < index_of("Rebuild the changelog") < index_of("Arm auto-merge")), names
+    assert (
+        index_of("actions/checkout")
+        < index_of("release-please-action")
+        < index_of("Rebuild the changelog")
+        < index_of("Arm auto-merge")
+    ), names
 
     # The tool derives entries from `git log <previous tag>..<this release>`, so
     # a shallow clone or missing tags silently changes what it computes.
-    checkout = next(s for s in steps
-                    if str(s.get("uses", "")).startswith("actions/checkout"))
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
     assert checkout["with"]["fetch-depth"] == 0, "needs full history for the range"
     assert checkout["with"]["fetch-tags"] is True, "needs tags to find the previous release"
 
@@ -284,8 +291,9 @@ def test_the_pr_title_check_guards_both_directions():
     check pass on everything."""
     wf = _REPO / ".github" / "workflows" / "pr-title.yml"
     body = _yaml(wf)["jobs"]["title"]["steps"][-1]["run"]
-    assert 'PACKAGED = ("jeles/", "pyproject.toml")' in body, \
+    assert 'PACKAGED = ("jeles/", "pyproject.toml")' in body, (
         "packaged path is wrong or was copied from another repo"
+    )
     assert "src/willow_mcp" not in body, "willow-mcp's path leaked into this port"
 
     # And it really is what the wheel ships.
@@ -300,8 +308,7 @@ def test_only_types_that_change_the_installed_package_cut_a_release():
     now that auto-merge does."""
     sections = _package_config()["changelog-sections"]
     visible = {s["type"] for s in sections if not s.get("hidden")}
-    assert visible == {"feat", "fix", "security", "perf", "refactor",
-                       "build", "deps"}, visible
+    assert visible == {"feat", "fix", "security", "perf", "refactor", "build", "deps"}, visible
     for t in ("docs", "test", "ci", "chore"):
         assert next(s for s in sections if s["type"] == t).get("hidden") is True
 
@@ -325,9 +332,11 @@ def test_a_breaking_change_below_1_0_cuts_1_0_0_rather_than_a_minor():
     cfg = _package_config()
     assert cfg.get("bump-minor-pre-major") is False, (
         "true caps a breaking change at a minor, which makes a downstream "
-        "`<1.0.0` cap meaningless. See willow-mcp docs/design/fleet-versioning.md")
-    assert cfg.get("bump-patch-for-minor-pre-major") is False, \
+        "`<1.0.0` cap meaningless. See willow-mcp docs/design/fleet-versioning.md"
+    )
+    assert cfg.get("bump-patch-for-minor-pre-major") is False, (
         "with this true, a feat would bump the patch instead of the minor"
+    )
     version = _json(_MANIFEST)["."]
     assert version.startswith("0."), (
         f"manifest is {version} — past 1.0 both flags are dead weight, because "
@@ -349,10 +358,9 @@ def test_the_checkout_uses_the_pat_so_its_pushes_are_not_gated():
     This is the fourth way this fleet has been bitten by token attribution, so
     it gets a test rather than a comment."""
     steps = _yaml(_RP_WF)["jobs"]["release-please"]["steps"]
-    checkout = next(s for s in steps
-                    if str(s.get("uses", "")).startswith("actions/checkout"))
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
     token = str((checkout.get("with") or {}).get("token", ""))
     assert _names_a_non_suppressed_credential(token), (
-        "checkout must carry a credential whose events trigger workflows. "
-        f"Got: {token!r}")
+        f"checkout must carry a credential whose events trigger workflows. Got: {token!r}"
+    )
     assert "GITHUB_TOKEN" not in token

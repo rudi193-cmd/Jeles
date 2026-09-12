@@ -102,9 +102,7 @@ def test_a_stale_readme_count_is_caught_by_this_check():
     anything too.
     """
     real_text = _CORPUS_README.read_text(encoding="utf-8")
-    planted = _COMPOSED_RE.sub(
-        "composing to **1369** question/answer nuggets", real_text
-    )
+    planted = _COMPOSED_RE.sub("composing to **1369** question/answer nuggets", real_text)
     assert planted != real_text  # the substitution actually landed
 
     _, planted_claim = _corpus_readme_claims(planted)

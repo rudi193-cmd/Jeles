@@ -32,6 +32,7 @@ Design choices, all in the box's grain:
   raw egress from inside a reaction is exactly the "correct code, wrong
   perimeter" trap; this module names it rather than hiding it.)
 """
+
 from __future__ import annotations
 
 import html
@@ -72,9 +73,13 @@ _MAX_BYTES = int(os.environ.get("JELES_SEARCH_MAX_BYTES", str(4 * 1024 * 1024)))
 _ALLOWED_SCHEMES = _egress.HTTP_OR_HTTPS
 
 
-def _get_json(url: str, headers: dict[str, str] | None = None,
-              *, allow_private: bool = False,
-              data: bytes | None = None) -> Any:
+def _get_json(
+    url: str,
+    headers: dict[str, str] | None = None,
+    *,
+    allow_private: bool = False,
+    data: bytes | None = None,
+) -> Any:
     """Fetch and decode JSON through the shared egress guard.
 
     The guard was previously a one-shot `url.startswith(("https://", "http://"))`
@@ -91,10 +96,15 @@ def _get_json(url: str, headers: dict[str, str] | None = None,
     `http://169.254.169.254/latest/meta-data/` was followed. One operator-chosen
     backend was buying every other backend an exemption.
     """
-    raw = _egress.fetch(url, allowed=_ALLOWED_SCHEMES, timeout=_TIMEOUT,
-                        max_bytes=_MAX_BYTES, data=data,
-                        allow_private=allow_private,
-                        headers={"User-Agent": _UA, **(headers or {})})
+    raw = _egress.fetch(
+        url,
+        allowed=_ALLOWED_SCHEMES,
+        timeout=_TIMEOUT,
+        max_bytes=_MAX_BYTES,
+        data=data,
+        allow_private=allow_private,
+        headers={"User-Agent": _UA, **(headers or {})},
+    )
     return json.loads(raw.decode("utf-8", "replace"))
 
 
@@ -121,8 +131,10 @@ def _searxng(query: str) -> list[dict[str, Any]]:
     # JELES_SEARXNG_URL themselves, and http://127.0.0.1:8888 is the
     # documented zero-config default.
     data = _get_json(f"{base}/search?{qs}", allow_private=True)
-    return [_hit(r.get("title"), r.get("url"), r.get("content"))
-            for r in (data.get("results") or [])[:_MAX]]
+    return [
+        _hit(r.get("title"), r.get("url"), r.get("content"))
+        for r in (data.get("results") or [])[:_MAX]
+    ]
 
 
 def _brave(query: str) -> list[dict[str, Any]]:
@@ -145,10 +157,13 @@ def _tavily(query: str) -> list[dict[str, Any]]:
     if not key:
         raise RuntimeError("TAVILY_API_KEY not set")
     body = json.dumps({"api_key": key, "query": query, "max_results": _MAX}).encode()
-    data = _get_json("https://api.tavily.com/search",
-                     headers={"Content-Type": "application/json"}, data=body)
-    return [_hit(r.get("title"), r.get("url"), r.get("content"))
-            for r in (data.get("results") or [])[:_MAX]]
+    data = _get_json(
+        "https://api.tavily.com/search", headers={"Content-Type": "application/json"}, data=body
+    )
+    return [
+        _hit(r.get("title"), r.get("url"), r.get("content"))
+        for r in (data.get("results") or [])[:_MAX]
+    ]
 
 
 # ── ddg: the DuckDuckGo HTML SERP, ported from willow-2.0's core/web_search.py
@@ -282,7 +297,10 @@ def _ddg_fetch(query: str, max_results: int = 8) -> list[dict[str, Any]]:
     body = urllib.parse.urlencode({"q": q, "b": "", "kl": "us-en"}).encode()
     try:
         raw = _egress.fetch(
-            _DDG_URL, allowed=_ALLOWED_SCHEMES, timeout=_TIMEOUT, max_bytes=_MAX_BYTES,
+            _DDG_URL,
+            allowed=_ALLOWED_SCHEMES,
+            timeout=_TIMEOUT,
+            max_bytes=_MAX_BYTES,
             data=body,
             # DuckDuckGo is a hardcoded public API with no claim to a private
             # address — explicit, like `_get_json`'s per-call argument, not a
@@ -323,7 +341,8 @@ def _ddg_fetch(query: str, max_results: int = 8) -> list[dict[str, Any]]:
     if not hits and _looks_like_results_page(text):
         log.warning(
             "ddg parser miss — HTTP 200, %d-byte results-like body, 0 links "
-            "parsed; DDG HTML structure may have changed (_LINK_RE)", len(text),
+            "parsed; DDG HTML structure may have changed (_LINK_RE)",
+            len(text),
         )
     return hits
 
@@ -512,8 +531,7 @@ def _ddg_html(query: str) -> list[dict[str, Any]]:
     breaker = _get_breaker("ddg")
     if not breaker.allow():
         raise SearchError(
-            "ddg circuit breaker open — too many recent failures; "
-            "skipping until cooldown elapses"
+            "ddg circuit breaker open — too many recent failures; skipping until cooldown elapses"
         )
     try:
         hits = _with_retry(lambda: _ddg_fetch(query, max_results=_MAX))
@@ -525,7 +543,10 @@ def _ddg_html(query: str) -> list[dict[str, Any]]:
 
 
 _BACKENDS: dict[str, Searcher] = {
-    "searxng": _searxng, "brave": _brave, "tavily": _tavily, "ddg": _ddg_html,
+    "searxng": _searxng,
+    "brave": _brave,
+    "tavily": _tavily,
+    "ddg": _ddg_html,
 }
 
 
@@ -568,7 +589,9 @@ def describe_backend(backend: str | None = None) -> dict[str, Any]:
     name = (backend or _default_backend_name()).lower()
     if name not in _BACKENDS:
         return {
-            "backend": name, "configured": False, "shallow": False,
+            "backend": name,
+            "configured": False,
+            "shallow": False,
             "requires": None,
             "reason": f"unknown backend {name!r}; choose one of {sorted(_BACKENDS)}",
         }
@@ -578,17 +601,26 @@ def describe_backend(backend: str | None = None) -> dict[str, Any]:
     shallow = name in _SHALLOW
 
     if not configured:
-        reason = (f"{needs} is not set, so every search returns no results — "
-                  f"which is indistinguishable from finding nothing")
+        reason = (
+            f"{needs} is not set, so every search returns no results — "
+            f"which is indistinguishable from finding nothing"
+        )
     elif shallow:
-        reason = (f"{name} is zero-config but too shallow to corroborate a "
-                  f"claim; set JELES_SEARXNG_URL (or a BRAVE_API_KEY / "
-                  f"TAVILY_API_KEY) for real depth")
+        reason = (
+            f"{name} is zero-config but too shallow to corroborate a "
+            f"claim; set JELES_SEARXNG_URL (or a BRAVE_API_KEY / "
+            f"TAVILY_API_KEY) for real depth"
+        )
     else:
         reason = ""
 
-    return {"backend": name, "configured": configured, "shallow": shallow,
-            "requires": needs, "reason": reason}
+    return {
+        "backend": name,
+        "configured": configured,
+        "shallow": shallow,
+        "requires": needs,
+        "reason": reason,
+    }
 
 
 def search_with_status(query: str, backend: str | None = None) -> dict[str, Any]:
@@ -604,19 +636,21 @@ def search_with_status(query: str, backend: str | None = None) -> dict[str, Any]
     name = info["backend"]
     fn = _BACKENDS.get(name)
     if fn is None:
-        return {"hits": [], "ok": False, "backend": name,
-                "shallow": False, "error": info["reason"]}
+        return {"hits": [], "ok": False, "backend": name, "shallow": False, "error": info["reason"]}
     try:
         hits = fn(query)
     except Exception as exc:
         # Include the configuration reason when there is one: "BRAVE_API_KEY is
         # not set" is a far more useful error than the KeyError it produces.
         detail = f"{type(exc).__name__}: {exc}"
-        return {"hits": [], "ok": False, "backend": name,
-                "shallow": info["shallow"],
-                "error": f"{info['reason']} ({detail})" if info["reason"] else detail}
-    return {"hits": hits, "ok": True, "backend": name,
-            "shallow": info["shallow"], "error": ""}
+        return {
+            "hits": [],
+            "ok": False,
+            "backend": name,
+            "shallow": info["shallow"],
+            "error": f"{info['reason']} ({detail})" if info["reason"] else detail,
+        }
+    return {"hits": hits, "ok": True, "backend": name, "shallow": info["shallow"], "error": ""}
 
 
 def make_searcher(backend: str | None = None) -> Searcher:
@@ -636,8 +670,7 @@ def make_searcher(backend: str | None = None) -> Searcher:
     name = (backend or _default_backend_name()).lower()
     fn = _BACKENDS.get(name)
     if fn is None:
-        raise ValueError(f"unknown search backend {name!r}; "
-                         f"choose one of {sorted(_BACKENDS)}")
+        raise ValueError(f"unknown search backend {name!r}; choose one of {sorted(_BACKENDS)}")
 
     info = describe_backend(name)
     warned = False
@@ -653,8 +686,9 @@ def make_searcher(backend: str | None = None) -> Searcher:
             # fail-soft: conflict_scan reads [] as "no witness". Say so anyway —
             # an empty result that is really a broken backend is the failure
             # mode this module was hardest to debug for.
-            log.warning("jeles search via %r failed for %r: %s: %s",
-                        name, query, type(exc).__name__, exc)
+            log.warning(
+                "jeles search via %r failed for %r: %s: %s", name, query, type(exc).__name__, exc
+            )
             return []
 
     return search

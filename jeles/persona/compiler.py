@@ -8,6 +8,7 @@ carrying its own hand-authored prose copy.
 
 Stdlib only. Deterministic: same JSON in, same prompt out.
 """
+
 from __future__ import annotations
 
 
@@ -141,8 +142,9 @@ def compile_persona(data: dict) -> str:
     if closing:
         parts.append(f"IMAGE: {closing}")
 
-    fac_rel = overview.get("relationship_to_other_faculty", "") or \
-        institutional.get("relationship_to_other_faculty", "")
+    fac_rel = overview.get("relationship_to_other_faculty", "") or institutional.get(
+        "relationship_to_other_faculty", ""
+    )
     if fac_rel:
         parts.append(f"FACULTY RELATIONSHIPS: {fac_rel}")
 
@@ -156,8 +158,9 @@ def compile_persona(data: dict) -> str:
         examples = [tc.get("character_response", "") for tc in test_cases]
         examples = [e for e in examples if e]
         if examples:
-            parts.append("EXAMPLE RESPONSES (correct register):\n" +
-                         "\n".join(f"- {e}" for e in examples))
+            parts.append(
+                "EXAMPLE RESPONSES (correct register):\n" + "\n".join(f"- {e}" for e in examples)
+            )
 
     _append_closing_discipline(parts, data.get("closing_discipline"))
 

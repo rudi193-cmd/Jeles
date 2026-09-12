@@ -38,6 +38,7 @@ Design, matching the rest of the package:
   ``HTTPS_PROXY`` if set), exactly as `search_adapter` does. In a gated
   deployment, route through willow-mcp's `JelesAdapter` instead.
 """
+
 from __future__ import annotations
 
 import json
@@ -93,9 +94,15 @@ def describe_remote() -> dict[str, Any]:
     local_sources = sorted(sources.SOURCES)
 
     if not base:
-        return {"lane": "local", "base_url": "", "configured": True,
-                "requires": None, "reason": "", "sources": local_sources,
-                "sources_lane": "local"}
+        return {
+            "lane": "local",
+            "base_url": "",
+            "configured": True,
+            "requires": None,
+            "reason": "",
+            "sources": local_sources,
+            "sources_lane": "local",
+        }
 
     # On the remote lane the listing is local knowledge about a remote service.
     # Say which, in the payload, rather than in a docstring the caller is not
@@ -108,18 +115,29 @@ def describe_remote() -> dict[str, Any]:
 
     if not secret:
         return {
-            "lane": "remote", "base_url": base, "configured": False,
+            "lane": "remote",
+            "base_url": base,
+            "configured": False,
             "requires": "JELES_REMOTE_SECRET",
-            "reason": ("JELES_REMOTE_URL is set but JELES_REMOTE_SECRET is not, "
-                       "so the remote refuses every search with 401 — which is "
-                       "indistinguishable from the collections having nothing. "
-                       "Unset JELES_REMOTE_URL to use the in-package sources."),
-            "sources": local_sources, "sources_lane": "local",
+            "reason": (
+                "JELES_REMOTE_URL is set but JELES_REMOTE_SECRET is not, "
+                "so the remote refuses every search with 401 — which is "
+                "indistinguishable from the collections having nothing. "
+                "Unset JELES_REMOTE_URL to use the in-package sources."
+            ),
+            "sources": local_sources,
+            "sources_lane": "local",
         }
 
-    return {"lane": "remote", "base_url": base, "configured": True,
-            "requires": "JELES_REMOTE_SECRET", "reason": remote_caveat,
-            "sources": local_sources, "sources_lane": "local"}
+    return {
+        "lane": "remote",
+        "base_url": base,
+        "configured": True,
+        "requires": "JELES_REMOTE_SECRET",
+        "reason": remote_caveat,
+        "sources": local_sources,
+        "sources_lane": "local",
+    }
 
 
 def to_hit(raw: dict[str, Any], idx: int = 0) -> dict[str, Any]:
@@ -202,9 +220,12 @@ def _post_remote(base: str, payload: dict, secret: str) -> Any:
     # sources lane gets the opposite default, because nothing it queries has a
     # legitimate private address.
     raw = _egress.fetch(
-        f"{base}/search", allowed=_ALLOWED_SCHEMES, timeout=_TIMEOUT,
+        f"{base}/search",
+        allowed=_ALLOWED_SCHEMES,
+        timeout=_TIMEOUT,
         allow_private=True,
-        max_bytes=_MAX_BYTES, data=json.dumps(payload).encode(),
+        max_bytes=_MAX_BYTES,
+        data=json.dumps(payload).encode(),
         headers={
             "User-Agent": _UA,
             "Content-Type": "application/json",
@@ -246,9 +267,11 @@ def _verdict(data: dict[str, Any]) -> tuple[bool, str]:
     timed_out = list(data.get("timed_out") or [])
 
     if not queried:
-        return False, ("no source was dispatched — every requested id was "
-                       "unknown, or the filter selected nothing. This is a "
-                       "configuration answer, not a search result.")
+        return False, (
+            "no source was dispatched — every requested id was "
+            "unknown, or the filter selected nothing. This is a "
+            "configuration answer, not a search result."
+        )
 
     def _sample(items: Any) -> str:
         pairs = items.items() if isinstance(items, dict) else ((i, "") for i in items)
@@ -266,10 +289,12 @@ def _verdict(data: dict[str, Any]) -> tuple[bool, str]:
             f"{len(failed)} of {len(queried)} sources failed and none returned "
             "anything. This response predates per-source accounting (no "
             "`skipped`/`timed_out`), so an abstention cannot be told from a "
-            f"successful empty look — treating it as an outage. {_sample(failed)}")
+            f"successful empty look — treating it as an outage. {_sample(failed)}"
+        )
 
-    looked = [sid for sid in queried
-              if sid not in failed and sid not in skipped and sid not in timed_out]
+    looked = [
+        sid for sid in queried if sid not in failed and sid not in skipped and sid not in timed_out
+    ]
     if looked:
         return True, ""
 
@@ -284,7 +309,8 @@ def _verdict(data: dict[str, Any]) -> tuple[bool, str]:
         f"not one of {len(queried)} sources completed a look — "
         + ", ".join(parts)
         + ". This is an outage, a missing key, or a blocked egress, not an "
-          "empty result.")
+        "empty result."
+    )
 
 
 def list_sources() -> list[dict[str, Any]]:
@@ -299,12 +325,15 @@ def list_sources() -> list[dict[str, Any]]:
     is absent, so this is how a caller finds out what it is *not* reaching.
     """
     return [
-        {"id": sid, "name": cfg.get("name", sid),
-         "key_required": bool(cfg.get("key_required", False)),
-         # Naming the variable is the actionable half. "this source needs a key"
-         # sends a caller reading source code; "set EUROPEANA_KEY" does not.
-         "key_env": cfg.get("key_env") or "",
-         "opt_in": bool(cfg.get("opt_in", False))}
+        {
+            "id": sid,
+            "name": cfg.get("name", sid),
+            "key_required": bool(cfg.get("key_required", False)),
+            # Naming the variable is the actionable half. "this source needs a key"
+            # sends a caller reading source code; "set EUROPEANA_KEY" does not.
+            "key_env": cfg.get("key_env") or "",
+            "opt_in": bool(cfg.get("opt_in", False)),
+        }
         for sid, cfg in sorted(sources.SOURCES.items())
     ]
 
@@ -339,25 +368,36 @@ def search_institutional(
     lane = info["lane"]
 
     if lane == "remote" and not info["configured"]:
-        return {"hits": [], "ok": False, "lane": lane, "sources_queried": [],
-                "failed": [], "total": 0, "error": info["reason"]}
+        return {
+            "hits": [],
+            "ok": False,
+            "lane": lane,
+            "sources_queried": [],
+            "failed": [],
+            "total": 0,
+            "error": info["reason"],
+        }
 
     try:
         if lane == "remote":
-            payload: dict[str, Any] = {"query": query,
-                                       "limit_per_source": limit_per_source}
+            payload: dict[str, Any] = {"query": query, "limit_per_source": limit_per_source}
             if sources_filter:
                 payload["sources"] = sources_filter
             data = _post_remote(info["base_url"], payload, _remote_secret())
         else:
-            data = sources.search(query, sources=sources_filter,
-                                  limit_per_source=limit_per_source)
+            data = sources.search(query, sources=sources_filter, limit_per_source=limit_per_source)
     except Exception as exc:
         detail = f"{type(exc).__name__}: {exc}"
-        log.warning("institutional search (%s lane) failed for %r: %s",
-                    lane, query, detail)
-        return {"hits": [], "ok": False, "lane": lane, "sources_queried": [],
-                "failed": [], "total": 0, "error": detail}
+        log.warning("institutional search (%s lane) failed for %r: %s", lane, query, detail)
+        return {
+            "hits": [],
+            "ok": False,
+            "lane": lane,
+            "sources_queried": [],
+            "failed": [],
+            "total": 0,
+            "error": detail,
+        }
 
     flat = _flatten(data.get("results") or {})
     hits = [to_hit(raw, i) for i, raw in enumerate(flat)]

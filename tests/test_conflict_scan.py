@@ -3,14 +3,17 @@
 Covers the three disciplines: conflict-biased framing, the two-independent-
 source corroboration gate (both sides), and propose-not-execute.
 """
+
 from jeles.reactions import conflict_scan as cs
 
 
 def _fake_searcher(by_query):
     """Return a searcher that yields canned results per query (dict lookup),
     defaulting to [] for anything not listed. No network, ever."""
+
     def search(query):
         return by_query.get(query, [])
+
     return search
 
 
@@ -35,19 +38,27 @@ def test_domain_independence_dedupes_same_site():
 
 def test_two_independent_sources_corroborate_to_a_nugget():
     # Two distinct domains across the query fan-out -> corroborated.
-    searcher = _fake_searcher({
-        "signed policy registry alternative that supersedes": [
-            {"title": "OPA signed bundles",
-             "url": "https://openpolicyagent.org/docs/bundles",
-             "snippet": "Bundles can be signed; the registry serves policy."},
-        ],
-        "signed policy registry vs prior art comparison": [
-            {"title": "OPA vs Cedar", "url": "https://osohq.com/learn/opa-vs-cedar",
-             "snippet": "Comparing signed policy distribution and registry design."},
-        ],
-    })
-    proposals = cs.react({"claim": "signed policy registry", "kind": "post_edit"},
-                         searcher=searcher)
+    searcher = _fake_searcher(
+        {
+            "signed policy registry alternative that supersedes": [
+                {
+                    "title": "OPA signed bundles",
+                    "url": "https://openpolicyagent.org/docs/bundles",
+                    "snippet": "Bundles can be signed; the registry serves policy.",
+                },
+            ],
+            "signed policy registry vs prior art comparison": [
+                {
+                    "title": "OPA vs Cedar",
+                    "url": "https://osohq.com/learn/opa-vs-cedar",
+                    "snippet": "Comparing signed policy distribution and registry design.",
+                },
+            ],
+        }
+    )
+    proposals = cs.react(
+        {"claim": "signed policy registry", "kind": "post_edit"}, searcher=searcher
+    )
     kinds = [p["driver"] for p in proposals]
     assert kinds[0] == "put_nugget", "corroborated conflict is proposed first"
     assert kinds[-1] == "frank_append", "every firing leaves one legible line"
@@ -60,16 +71,24 @@ def test_two_independent_sources_corroborate_to_a_nugget():
 
 def test_single_source_stays_a_contested_gap():
     # Two hits, one domain -> one witness -> not corroborated -> gap.
-    searcher = _fake_searcher({
-        "my design existing implementation library": [
-            {"title": "A prior design", "url": "https://example.com/a",
-             "snippet": "an earlier design of the same shape"},
-        ],
-        "my design alternative that supersedes": [
-            {"title": "Another design", "url": "https://example.com/b",
-             "snippet": "a competing design"},
-        ],
-    })
+    searcher = _fake_searcher(
+        {
+            "my design existing implementation library": [
+                {
+                    "title": "A prior design",
+                    "url": "https://example.com/a",
+                    "snippet": "an earlier design of the same shape",
+                },
+            ],
+            "my design alternative that supersedes": [
+                {
+                    "title": "Another design",
+                    "url": "https://example.com/b",
+                    "snippet": "a competing design",
+                },
+            ],
+        }
+    )
     proposals = cs.react({"claim": "my design"}, searcher=searcher)
     kinds = [p["driver"] for p in proposals]
     assert "put_nugget" not in kinds
@@ -85,26 +104,42 @@ def test_a_failing_query_does_not_sink_the_scan():
     def flaky(query):
         if "supersedes" in query:
             raise RuntimeError("network hiccup")
-        hit_a = {"title": "A resilient claim", "url": "https://a.org/x",
-                 "snippet": "prior work on the resilient claim"}
-        hit_b = {"title": "Resilient claim, revisited", "url": "https://b.org/y",
-                 "snippet": "supersedes the resilient claim"}
-        return [hit_a] if "existing" in query else \
-               [hit_b] if "comparison" in query else []
+        hit_a = {
+            "title": "A resilient claim",
+            "url": "https://a.org/x",
+            "snippet": "prior work on the resilient claim",
+        }
+        hit_b = {
+            "title": "Resilient claim, revisited",
+            "url": "https://b.org/y",
+            "snippet": "supersedes the resilient claim",
+        }
+        return [hit_a] if "existing" in query else [hit_b] if "comparison" in query else []
+
     proposals = cs.react({"claim": "resilient claim"}, searcher=flaky)
     # a.org + b.org still corroborate despite the raised query.
     assert proposals[0]["driver"] == "put_nugget"
 
 
 def test_propose_not_execute_writes_nothing_until_apply():
-    searcher = _fake_searcher({
-        "widget cache alternative that supersedes": [
-            {"title": "Widget cache, prior art", "url": "https://one.com/a",
-             "snippet": "an existing widget cache"}],
-        "widget cache vs prior art comparison": [
-            {"title": "Comparing widget caches", "url": "https://two.com/b",
-             "snippet": "widget cache designs compared"}],
-    })
+    searcher = _fake_searcher(
+        {
+            "widget cache alternative that supersedes": [
+                {
+                    "title": "Widget cache, prior art",
+                    "url": "https://one.com/a",
+                    "snippet": "an existing widget cache",
+                }
+            ],
+            "widget cache vs prior art comparison": [
+                {
+                    "title": "Comparing widget caches",
+                    "url": "https://two.com/b",
+                    "snippet": "widget cache designs compared",
+                }
+            ],
+        }
+    )
     proposals = cs.react({"claim": "widget cache"}, searcher=searcher)
 
     calls = {"nuggets": [], "gaps": [], "frank": []}
@@ -114,9 +149,9 @@ def test_propose_not_execute_writes_nothing_until_apply():
         log_gap=lambda **kw: calls["gaps"].append(kw) or {"id": "g1"},
         frank=lambda entry: calls["frank"].append(entry) or {"appended": True},
     )
-    assert len(calls["nuggets"]) == 1          # corroborated -> one nugget
+    assert len(calls["nuggets"]) == 1  # corroborated -> one nugget
     assert len(calls["gaps"]) == 0
-    assert len(calls["frank"]) == 1            # one legible line
+    assert len(calls["frank"]) == 1  # one legible line
     assert receipts[0]["result"]["action"] == "created"
 
 
@@ -146,10 +181,16 @@ def test_a_search_engine_is_not_a_source_about_itself():
     URLs. Paired with the single Wikipedia AbstractURL that cleared a two-source
     bar for any claim whatsoever."""
     ddg_shaped = lambda q: [  # noqa: E731
-        {"title": "Policy", "url": "https://en.wikipedia.org/wiki/Policy",
-         "snippet": "A policy is a deliberate system of principles."},
-        {"title": "Registry", "url": "https://duckduckgo.com/Registry",
-         "snippet": "A registry is a collection of records."},
+        {
+            "title": "Policy",
+            "url": "https://en.wikipedia.org/wiki/Policy",
+            "snippet": "A policy is a deliberate system of principles.",
+        },
+        {
+            "title": "Registry",
+            "url": "https://duckduckgo.com/Registry",
+            "snippet": "A registry is a collection of records.",
+        },
     ]
     assert "put_nugget" not in _drivers(ddg_shaped)
     assert "log_gap" in _drivers(ddg_shaped)
@@ -159,10 +200,16 @@ def test_two_url_shorteners_are_not_two_sources():
     """Opaque, and both can point at the same page — the exact opposite of the
     independence the rule is trying to establish."""
     shortened = lambda q: [  # noqa: E731
-        {"title": "Signed reaction registry", "url": "https://bit.ly/3xYz",
-         "snippet": "a signed reaction registry"},
-        {"title": "Signed reaction registry", "url": "https://t.co/abc",
-         "snippet": "a signed reaction registry"},
+        {
+            "title": "Signed reaction registry",
+            "url": "https://bit.ly/3xYz",
+            "snippet": "a signed reaction registry",
+        },
+        {
+            "title": "Signed reaction registry",
+            "url": "https://t.co/abc",
+            "snippet": "a signed reaction registry",
+        },
     ]
     assert "put_nugget" not in _drivers(shortened)
 
@@ -174,10 +221,16 @@ def test_address_literals_witness_nothing():
     assert cs._domain("http://93.184.216.34/a") == ""
     assert cs._domain("http://1.2.3.4/x") == ""
     ips = lambda q: [  # noqa: E731
-        {"title": "signed reaction registry", "url": "http://93.184.216.34/a",
-         "snippet": "signed reaction registry"},
-        {"title": "signed reaction registry", "url": "http://93.184.216.99/b",
-         "snippet": "signed reaction registry"},
+        {
+            "title": "signed reaction registry",
+            "url": "http://93.184.216.34/a",
+            "snippet": "signed reaction registry",
+        },
+        {
+            "title": "signed reaction registry",
+            "url": "http://93.184.216.99/b",
+            "snippet": "signed reaction registry",
+        },
     ]
     assert "put_nugget" not in _drivers(ips)
 
@@ -185,10 +238,12 @@ def test_address_literals_witness_nothing():
 def test_relevant_looking_domains_still_need_to_mention_the_claim():
     """Two real, distinct, reputable sites — about nothing to do with it."""
     off_topic = lambda q: [  # noqa: E731
-        {"title": "Cake recipes", "url": "https://allrecipes.com/x",
-         "snippet": "flour, sugar, butter"},
-        {"title": "Weather", "url": "https://bbc.co.uk/weather",
-         "snippet": "rain tomorrow"},
+        {
+            "title": "Cake recipes",
+            "url": "https://allrecipes.com/x",
+            "snippet": "flour, sugar, butter",
+        },
+        {"title": "Weather", "url": "https://bbc.co.uk/weather", "snippet": "rain tomorrow"},
     ]
     assert "put_nugget" not in _drivers(off_topic)
 
@@ -196,11 +251,16 @@ def test_relevant_looking_domains_still_need_to_mention_the_claim():
 def test_genuine_prior_art_still_corroborates():
     """The gate must not buy correctness with uselessness."""
     genuine = lambda q: [  # noqa: E731
-        {"title": "Signed policy bundles in OPA",
-         "url": "https://openpolicyagent.org/docs",
-         "snippet": "a signed registry of reaction bundles"},
-        {"title": "Cedar signed registry", "url": "https://cedarpolicy.com/x",
-         "snippet": "a signed reaction registry design"},
+        {
+            "title": "Signed policy bundles in OPA",
+            "url": "https://openpolicyagent.org/docs",
+            "snippet": "a signed registry of reaction bundles",
+        },
+        {
+            "title": "Cedar signed registry",
+            "url": "https://cedarpolicy.com/x",
+            "snippet": "a signed reaction registry design",
+        },
     ]
     assert "put_nugget" in _drivers(genuine)
 
@@ -219,10 +279,16 @@ def test_a_relevant_page_sharing_no_vocabulary_is_not_counted():
     decision on the record rather than a surprise.
     """
     oblique = lambda q: [  # noqa: E731
-        {"title": "Ledger of attested handlers", "url": "https://one.example/a",
-         "snippet": "an append-only ledger of attested handlers"},
-        {"title": "Verified dispatch table", "url": "https://two.example/b",
-         "snippet": "a verified dispatch table"},
+        {
+            "title": "Ledger of attested handlers",
+            "url": "https://one.example/a",
+            "snippet": "an append-only ledger of attested handlers",
+        },
+        {
+            "title": "Verified dispatch table",
+            "url": "https://two.example/b",
+            "snippet": "a verified dispatch table",
+        },
     ]
     assert "put_nugget" not in _drivers(oblique)
     assert "log_gap" in _drivers(oblique)
@@ -242,13 +308,22 @@ def test_sources_are_exactly_the_witnesses():
     """A human re-verifying "the sources" must see what actually cleared the
     bar — not every URL the search returned."""
     mixed = lambda q: [  # noqa: E731
-        {"title": "Signed reaction registry", "url": "https://real.org/a",
-         "snippet": "a signed reaction registry"},
-        {"title": "Registry", "url": "https://duckduckgo.com/Registry",
-         "snippet": "a signed reaction registry"},
+        {
+            "title": "Signed reaction registry",
+            "url": "https://real.org/a",
+            "snippet": "a signed reaction registry",
+        },
+        {
+            "title": "Registry",
+            "url": "https://duckduckgo.com/Registry",
+            "snippet": "a signed reaction registry",
+        },
         {"title": "Cake", "url": "https://allrecipes.com/x", "snippet": "flour"},
-        {"title": "Signed reaction registry", "url": "https://other.org/b",
-         "snippet": "a signed reaction registry"},
+        {
+            "title": "Signed reaction registry",
+            "url": "https://other.org/b",
+            "snippet": "a signed reaction registry",
+        },
     ]
     proposals = cs.react({"claim": _INVENTED}, searcher=mixed)
     nugget = next(p for p in proposals if p["driver"] == "put_nugget")["args"]
@@ -289,9 +364,11 @@ def _recording_apply(proposals):
 def test_a_proposal_cannot_claim_a_rung_it_is_not_entitled_to():
     """The escalation that worked: "human" reads back as `status: verified` and
     `ask_corpus` answers from it as settled fact."""
-    receipts, calls = _recording_apply([
-        {"driver": "put_nugget", "args": {**_GOOD_ARGS, "verification_kind": "human"}},
-    ])
+    receipts, calls = _recording_apply(
+        [
+            {"driver": "put_nugget", "args": {**_GOOD_ARGS, "verification_kind": "human"}},
+        ]
+    )
     assert calls["nuggets"] == [], "the escalating proposal must never reach the driver"
     assert receipts[0]["result"]["error"] == "proposal_args_refused"
     assert receipts[0]["result"]["rejected"] == ["verification_kind"]
@@ -304,9 +381,11 @@ def test_the_rung_is_pinned_by_the_driver_not_carried_by_the_proposal():
     _, calls = _recording_apply([{"driver": "put_nugget", "args": dict(_GOOD_ARGS)}])
     assert calls["nuggets"][0]["verification_kind"] == "machine"
 
-    _, calls = _recording_apply([
-        {"driver": "put_nugget", "args": {**_GOOD_ARGS, "verification_kind": "machine"}},
-    ])
+    _, calls = _recording_apply(
+        [
+            {"driver": "put_nugget", "args": {**_GOOD_ARGS, "verification_kind": "machine"}},
+        ]
+    )
     assert calls["nuggets"][0]["verification_kind"] == "machine"
 
 
@@ -314,9 +393,11 @@ def test_a_proposal_cannot_overwrite_a_nugget_by_id():
     """Refused here, before `put_nugget`'s guard has to catch it — and it would
     not have: equal-rung overwrite is not a downgrade, so `verification_kind`
     plus `nugget_id` walked past that guard and updated the record in place."""
-    receipts, calls = _recording_apply([
-        {"driver": "put_nugget", "args": {**_GOOD_ARGS, "nugget_id": "272872c6"}},
-    ])
+    receipts, calls = _recording_apply(
+        [
+            {"driver": "put_nugget", "args": {**_GOOD_ARGS, "nugget_id": "272872c6"}},
+        ]
+    )
     assert calls["nuggets"] == []
     assert receipts[0]["result"]["rejected"] == ["nugget_id"]
     assert "never replace one by id" in receipts[0]["result"]["detail"]
@@ -326,10 +407,14 @@ def test_spoofable_provenance_fields_are_refused():
     """`written_by` is meant to be the fact beside `verified_by`'s claim — which
     app actually made the write. A proposal that can set it erases the
     distinction, and `verified_at` backdates the check."""
-    receipts, calls = _recording_apply([
-        {"driver": "put_nugget",
-         "args": {**_GOOD_ARGS, "written_by": "the-operator", "verified_at": "2026-01-01"}},
-    ])
+    receipts, calls = _recording_apply(
+        [
+            {
+                "driver": "put_nugget",
+                "args": {**_GOOD_ARGS, "written_by": "the-operator", "verified_at": "2026-01-01"},
+            },
+        ]
+    )
     assert calls["nuggets"] == []
     assert receipts[0]["result"]["rejected"] == ["verified_at", "written_by"]
 
@@ -337,9 +422,11 @@ def test_spoofable_provenance_fields_are_refused():
 def test_an_unknown_key_is_refused_visibly_not_dropped():
     """Silence is the bug this repo keeps finding: an argument the driver was
     never going to honour must show up in the receipt, not vanish."""
-    receipts, calls = _recording_apply([
-        {"driver": "log_gap", "args": {"question": "q", "bogus": 1}},
-    ])
+    receipts, calls = _recording_apply(
+        [
+            {"driver": "log_gap", "args": {"question": "q", "bogus": 1}},
+        ]
+    )
     assert calls["gaps"] == []
     assert receipts[0]["result"]["error"] == "proposal_args_refused"
     assert receipts[0]["result"]["rejected"] == ["bogus"]
@@ -380,23 +467,33 @@ def test_reacts_own_output_still_applies_unchanged():
     """The end-to-end requirement: what `react` emits must still produce exactly
     the store writes it did before the allowlist, on both branches."""
     corroborating = lambda q: [  # noqa: E731
-        {"title": "Widget cache prior art", "url": "https://one.com/a",
-         "snippet": "an existing widget cache"},
-        {"title": "Widget caches compared", "url": "https://two.com/b",
-         "snippet": "widget cache designs compared"},
+        {
+            "title": "Widget cache prior art",
+            "url": "https://one.com/a",
+            "snippet": "an existing widget cache",
+        },
+        {
+            "title": "Widget caches compared",
+            "url": "https://two.com/b",
+            "snippet": "widget cache designs compared",
+        },
     ]
-    receipts, calls = _recording_apply(
-        cs.react({"claim": "widget cache"}, searcher=corroborating))
+    receipts, calls = _recording_apply(cs.react({"claim": "widget cache"}, searcher=corroborating))
     assert [r["driver"] for r in receipts] == ["put_nugget", "frank_append"]
     assert not any("error" in r["result"] for r in receipts)
     written = calls["nuggets"][0]
     assert written["verification_kind"] == "machine"
     assert written["verified_by"] == cs.WITNESS
-    assert sorted(written) == ["answer", "question", "sources", "tags", "verification_kind",
-                               "verified_by"], "the allowlist must pass react's keys through"
+    assert sorted(written) == [
+        "answer",
+        "question",
+        "sources",
+        "tags",
+        "verification_kind",
+        "verified_by",
+    ], "the allowlist must pass react's keys through"
 
-    receipts, calls = _recording_apply(
-        cs.react({"claim": "widget cache"}, searcher=lambda q: []))
+    receipts, calls = _recording_apply(cs.react({"claim": "widget cache"}, searcher=lambda q: []))
     assert [r["driver"] for r in receipts] == ["log_gap", "frank_append"]
     assert not any("error" in r["result"] for r in receipts)
     assert calls["gaps"][0] == {"question": "Prior-art / conflict scan: widget cache"}

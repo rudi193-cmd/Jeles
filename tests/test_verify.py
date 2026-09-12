@@ -5,6 +5,7 @@ end up labelled `corroborated` without two institutions actually standing behind
 it, and whether a claim that *is* backed can be reported as `unsupported`. Those
 two are the only errors that matter here, so most of this file is about them.
 """
+
 from __future__ import annotations
 
 import ast
@@ -28,14 +29,14 @@ def _stub(text):
 
 # ── the verdicts ─────────────────────────────────────────────────────────────
 
+
 def test_two_distinct_institutions_corroborate_a_claim():
     citations = [{"n": 1, "source": "NASA"}, {"n": 2, "source": "arXiv"}]
     out = verify_claims("ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"))
     claim = out["claims"][0]
     assert claim["verdict"] == "corroborated"
     assert claim["institutions"] == ["NASA", "arXiv"]
-    assert out["summary"] == {"total": 1, "corroborated": 1,
-                              "single_source": 0, "unsupported": 0}
+    assert out["summary"] == {"total": 1, "corroborated": 1, "single_source": 0, "unsupported": 0}
 
 
 def test_two_citations_from_one_institution_do_not_corroborate():
@@ -66,8 +67,10 @@ def test_a_name_wrapped_across_lines_is_still_one_institution():
     """Institution labels arrive out of XML and JSON text nodes, which is where
     a name picks up a newline or a doubled space in the middle. Comparing the
     raw strings makes that punctuation into a second institution."""
-    citations = [{"n": 1, "source": "Library of Congress"},
-                 {"n": 2, "source": "Library\n   of  Congress"}]
+    citations = [
+        {"n": 1, "source": "Library of Congress"},
+        {"n": 2, "source": "Library\n   of  Congress"},
+    ]
     out = verify_claims("ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"))
     assert out["claims"][0]["verdict"] == "single_source"
 
@@ -88,19 +91,23 @@ def test_an_invented_number_cannot_manufacture_corroboration():
 
 def test_the_bar_is_configurable_without_touching_the_shared_default():
     citations = [{"n": 1, "source": "NASA"}, {"n": 2, "source": "arXiv"}]
-    out = verify_claims("ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"),
-                        min_institutions=3)
+    out = verify_claims(
+        "ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"), min_institutions=3
+    )
     assert out["claims"][0]["verdict"] == "single_source"
 
 
 # ── the unnamed citation ─────────────────────────────────────────────────────
 
+
 def test_a_backed_claim_is_never_reported_unsupported_for_want_of_a_name():
     """An absent `institution` is real — `tests/test_sources.py` pins that jeles
     leaves it empty rather than inventing one. Dropping such citations turned
     "two records back this" into the strongest available denial."""
-    citations = [{"n": 1, "source": "", "url": "https://www.loc.gov/item/1"},
-                 {"n": 2, "source": "", "url": "https://arxiv.org/abs/2"}]
+    citations = [
+        {"n": 1, "source": "", "url": "https://www.loc.gov/item/1"},
+        {"n": 2, "source": "", "url": "https://arxiv.org/abs/2"},
+    ]
     out = verify_claims("ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"))
     claim = out["claims"][0]
     assert claim["verdict"] == "corroborated"
@@ -108,8 +115,10 @@ def test_a_backed_claim_is_never_reported_unsupported_for_want_of_a_name():
 
 
 def test_two_unnamed_citations_from_one_site_are_one_source():
-    citations = [{"n": 1, "url": "https://www.loc.gov/item/1"},
-                 {"n": 2, "url": "https://catalog.loc.gov/item/2"}]
+    citations = [
+        {"n": 1, "url": "https://www.loc.gov/item/1"},
+        {"n": 2, "url": "https://catalog.loc.gov/item/2"},
+    ]
     out = verify_claims("ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"))
     assert out["claims"][0]["verdict"] == "single_source"
     assert out["claims"][0]["institutions"] == ["loc.gov"]
@@ -158,13 +167,16 @@ def test_source_over_institution_is_a_contract_a_registry_caller_must_honor():
 def test_the_label_outranks_the_site_so_one_resolver_is_not_one_institution():
     """18 source adapters build a doi.org citation URL. Leading with the domain
     would fold every publisher behind the resolver into a single source."""
-    citations = [{"n": 1, "source": "Nature", "url": "https://doi.org/10.1000/a"},
-                 {"n": 2, "source": "Science", "url": "https://doi.org/10.1000/b"}]
+    citations = [
+        {"n": 1, "source": "Nature", "url": "https://doi.org/10.1000/a"},
+        {"n": 2, "source": "Science", "url": "https://doi.org/10.1000/b"},
+    ]
     out = verify_claims("ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"))
     assert out["claims"][0]["verdict"] == "corroborated"
 
 
 # ── reading what the model wrote ─────────────────────────────────────────────
+
 
 def test_well_formed_lines_parse_to_claims_and_numbers():
     raw = "CLAIM: The sky is blue || SOURCES: 1, 3\nCLAIM: Water is wet || SOURCES: NONE"
@@ -203,23 +215,30 @@ def test_an_empty_claim_body_is_skipped_rather_than_reported():
 
 # ── degraded inputs ──────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("answer,citations", [
-    ("", []),
-    ("", [{"n": 1, "source": "NASA"}]),
-    ("an answer", []),
-])
+
+@pytest.mark.parametrize(
+    "answer,citations",
+    [
+        ("", []),
+        ("", [{"n": 1, "source": "NASA"}]),
+        ("an answer", []),
+    ],
+)
 def test_nothing_to_attribute_to_short_circuits_before_the_model(answer, citations):
     def never(*args):
         raise AssertionError("the model must not be called with nothing to attribute")
 
     out = verify_claims(answer, "block", citations, never)
-    assert out == {"claims": [], "summary": {"total": 0, "corroborated": 0,
-                                             "single_source": 0, "unsupported": 0}}
+    assert out == {
+        "claims": [],
+        "summary": {"total": 0, "corroborated": 0, "single_source": 0, "unsupported": 0},
+    }
 
 
 def test_a_model_failure_is_reported_not_raised():
     """A fact-check that could not run is a missing verdict. Letting it raise
     would trade the caller's degraded answer for no answer at all."""
+
     def boom(system, history, user):
         raise RuntimeError("llm down")
 
@@ -233,27 +252,37 @@ def test_a_citation_with_no_usable_number_is_ignored_not_fatal():
     """`n` is whatever the host put there. A string cannot match a parsed source
     number, and an unhashable one cannot even be looked up — neither may take
     down the verification of the citations that are well-formed."""
-    citations = [{"n": "one", "source": "NASA"},
-                 {"n": ["also not a number"], "source": "Reuters"},
-                 {"n": 2, "source": "arXiv"}]
+    citations = [
+        {"n": "one", "source": "NASA"},
+        {"n": ["also not a number"], "source": "Reuters"},
+        {"n": 2, "source": "arXiv"},
+    ]
     out = verify_claims("ans", "block", citations, _stub("CLAIM: x || SOURCES: 1,2"))
     assert out["claims"][0]["institutions"] == ["arXiv"]
     assert out["claims"][0]["verdict"] == "single_source"
 
 
 def test_the_summary_counts_every_verdict_it_reports():
-    citations = [{"n": 1, "source": "NASA"}, {"n": 2, "source": "arXiv"},
-                 {"n": 3, "source": "NASA"}]
-    out = verify_claims("ans", "block", citations, _stub(
-        "CLAIM: corroborated claim || SOURCES: 1,2\n"
-        "CLAIM: single claim || SOURCES: 1,3\n"
-        "CLAIM: unsupported claim || SOURCES: NONE\n"
-    ))
-    assert out["summary"] == {"total": 3, "corroborated": 1,
-                              "single_source": 1, "unsupported": 1}
+    citations = [
+        {"n": 1, "source": "NASA"},
+        {"n": 2, "source": "arXiv"},
+        {"n": 3, "source": "NASA"},
+    ]
+    out = verify_claims(
+        "ans",
+        "block",
+        citations,
+        _stub(
+            "CLAIM: corroborated claim || SOURCES: 1,2\n"
+            "CLAIM: single claim || SOURCES: 1,3\n"
+            "CLAIM: unsupported claim || SOURCES: NONE\n"
+        ),
+    )
+    assert out["summary"] == {"total": 3, "corroborated": 1, "single_source": 1, "unsupported": 1}
 
 
 # ── the seams this module promises to keep ───────────────────────────────────
+
 
 def test_the_corroboration_bar_is_the_one_the_conflict_reaction_applies():
     """Two modules, one rule. Stated in `_independence`, and pinned here so a
@@ -271,18 +300,22 @@ def test_the_verifier_has_no_egress_of_its_own():
     tree = ast.parse(Path(verify.__file__).read_text(encoding="utf-8"))
     imported = {
         alias.name.split(".")[0]
-        for node in ast.walk(tree) if isinstance(node, ast.Import)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
         for alias in node.names
     } | {
         (node.module or "").split(".")[0]
-        for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
     }
     assert not imported & {"urllib", "socket", "ssl", "http", "requests"}
     called = {
-        node.func.id for node in ast.walk(tree)
+        node.func.id
+        for node in ast.walk(tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     } | {
-        node.func.attr for node in ast.walk(tree)
+        node.func.attr
+        for node in ast.walk(tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
     }
     assert not called & {"urlopen", "fetch", "open", "read"}

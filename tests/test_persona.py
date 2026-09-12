@@ -35,6 +35,7 @@ def test_load_persona_is_cached():
 
 # -- persona_prompt: the combine (#18) -------------------------------------
 
+
 def test_persona_prompt_renders_a_string():
     p = jeles.persona_prompt()
     assert isinstance(p, str) and p.startswith("You are Jeles")
@@ -46,20 +47,21 @@ def test_persona_prompt_is_a_superset_of_the_old_prose():
     # must survive the combine into the compiled prompt — nothing lost.
     p = jeles.persona_prompt()
     for beat in (
-        "misfiled",                       # the core principle
-        "bifurcated",                     # the bifurcated vision
-        "Giles Coefficient",              # archetype reference
-        "Pigeon",                         # the faculty relationship
-        "Binder",                         # relationship to the Binder
-        "ARCH 301",                       # a course
-        "ROLE IN THE PRODUCT",            # the product-role flow (folded in)
-        "resting in the wrong drawer",    # the signature phrase (folded in)
-        "without looking up",             # a voice signature
+        "misfiled",  # the core principle
+        "bifurcated",  # the bifurcated vision
+        "Giles Coefficient",  # archetype reference
+        "Pigeon",  # the faculty relationship
+        "Binder",  # relationship to the Binder
+        "ARCH 301",  # a course
+        "ROLE IN THE PRODUCT",  # the product-role flow (folded in)
+        "resting in the wrong drawer",  # the signature phrase (folded in)
+        "without looking up",  # a voice signature
     ):
         assert beat in p, f"combine dropped: {beat!r}"
 
 
 def test_compiler_is_deterministic():
     from jeles.persona.compiler import compile_persona
+
     data = jeles.load_persona()
     assert compile_persona(data) == compile_persona(data)

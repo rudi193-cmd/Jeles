@@ -14,6 +14,7 @@ file and forgetting it fails as a live request rather than as an assertion.
 `_egress.real_opener` is captured here before anything can patch it, for the
 handful of tests that need to introspect the genuine handler chain.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -36,5 +37,4 @@ def _egress_opener_delegates_to_urlopen(monkeypatch):
     # Accepts `allow_private` because the real `opener` takes it — a shim with
     # a narrower signature turns a real call into a TypeError that the caller
     # swallows, and every hit disappears with only a warning to say why.
-    monkeypatch.setattr(_egress, "opener",
-                        lambda allowed, *, allow_private=False: _Delegating)
+    monkeypatch.setattr(_egress, "opener", lambda allowed, *, allow_private=False: _Delegating)

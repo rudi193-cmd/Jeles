@@ -9,6 +9,7 @@ implement.
 These tests use the real opener (`conftest.real_opener`), not the delegating
 seam every other test file gets, because the handler chain *is* the subject.
 """
+
 from __future__ import annotations
 
 import io
@@ -23,16 +24,19 @@ from jeles import _egress
 # ── The scheme check ────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("url, https_only, http_or_https", [
-    ("https://example.org/x", True, True),
-    ("HTTPS://example.org/x", True, True),      # scheme is case-insensitive
-    ("http://example.org/x", False, True),      # the one difference between lanes
-    ("ftp://example.org/x", False, False),
-    ("file:///etc/passwd", False, False),
-    ("data:text/plain,hello", False, False),
-    ("gopher://example.org/x", False, False),
-    ("", False, False),
-])
+@pytest.mark.parametrize(
+    "url, https_only, http_or_https",
+    [
+        ("https://example.org/x", True, True),
+        ("HTTPS://example.org/x", True, True),  # scheme is case-insensitive
+        ("http://example.org/x", False, True),  # the one difference between lanes
+        ("ftp://example.org/x", False, False),
+        ("file:///etc/passwd", False, False),
+        ("data:text/plain,hello", False, False),
+        ("gopher://example.org/x", False, False),
+        ("", False, False),
+    ],
+)
 def test_the_scheme_check_matches_each_lanes_policy(url, https_only, http_or_https):
     assert _egress.scheme_ok(url, _egress.HTTPS_ONLY) is https_only
     assert _egress.scheme_ok(url, _egress.HTTP_OR_HTTPS) is http_or_https
@@ -42,27 +46,37 @@ def test_urlopen_refuses_a_disallowed_scheme_before_opening():
     """Fail-closed, and name the policy in the message — a bare "refused" sends
     the reader to the source to find out which set was in force."""
     with pytest.raises(ValueError, match=r"scheme outside \['https'\]"):
-        _egress.urlopen(urllib.request.Request("http://example.org/x"),
-                        allowed=_egress.HTTPS_ONLY, timeout=1)
+        _egress.urlopen(
+            urllib.request.Request("http://example.org/x"), allowed=_egress.HTTPS_ONLY, timeout=1
+        )
 
 
 # ── The redirect hop, which is what all three modules were missing ──────────
 
 
-@pytest.mark.parametrize("allowed, newurl, refused", [
-    (_egress.HTTPS_ONLY, "https://example.org/b", False),
-    # stdlib's own filter permits http, https *and* ftp. ftp is the hop it lets
-    # through; for an https-only caller so is a silent downgrade to http.
-    (_egress.HTTPS_ONLY, "http://example.org/b", True),
-    (_egress.HTTPS_ONLY, "ftp://evil.example/x", True),
-    (_egress.HTTPS_ONLY, "file:///etc/passwd", True),
-    (_egress.HTTP_OR_HTTPS, "http://example.org/b", False),
-    (_egress.HTTP_OR_HTTPS, "ftp://evil.example/x", True),
-])
+@pytest.mark.parametrize(
+    "allowed, newurl, refused",
+    [
+        (_egress.HTTPS_ONLY, "https://example.org/b", False),
+        # stdlib's own filter permits http, https *and* ftp. ftp is the hop it lets
+        # through; for an https-only caller so is a silent downgrade to http.
+        (_egress.HTTPS_ONLY, "http://example.org/b", True),
+        (_egress.HTTPS_ONLY, "ftp://evil.example/x", True),
+        (_egress.HTTPS_ONLY, "file:///etc/passwd", True),
+        (_egress.HTTP_OR_HTTPS, "http://example.org/b", False),
+        (_egress.HTTP_OR_HTTPS, "ftp://evil.example/x", True),
+    ],
+)
 def test_the_scheme_is_rechecked_on_every_redirect_hop(allowed, newurl, refused):
     handler = _egress.SchemeGuardedRedirects(allowed)
-    args = (urllib.request.Request("https://example.org/a"), io.BytesIO(b""),
-            302, "Found", {}, newurl)
+    args = (
+        urllib.request.Request("https://example.org/a"),
+        io.BytesIO(b""),
+        302,
+        "Found",
+        {},
+        newurl,
+    )
     if refused:
         with pytest.raises(urllib.error.HTTPError, match="refusing redirect"):
             handler.redirect_request(*args)
@@ -86,8 +100,7 @@ def test_a_live_redirect_to_ftp_does_not_reach_the_target():
     target.bind(("127.0.0.1", 0))
     target.listen(1)
     arrived = []
-    threading.Thread(target=lambda: (target.accept(), arrived.append(True)),
-                     daemon=True).start()
+    threading.Thread(target=lambda: (target.accept(), arrived.append(True)), daemon=True).start()
     dest = f"ftp://127.0.0.1:{target.getsockname()[1]}/x"
 
     class _Redirector(http.server.BaseHTTPRequestHandler):
@@ -136,8 +149,9 @@ def test_the_http_lane_installs_an_http_transport_and_the_https_lane_does_not():
     assert "HTTPHandler" in both
     for names in (https_only, both):
         assert "SchemeGuardedRedirects" in names
-        assert "HTTPRedirectHandler" not in names, \
+        assert "HTTPRedirectHandler" not in names, (
             "the unguarded default must not also be installed"
+        )
         assert not (names & {"FileHandler", "FTPHandler", "DataHandler"})
 
 
@@ -152,8 +166,8 @@ def test_no_opener_is_built_at_import():
     `jeles` was first imported."""
     import subprocess
     import sys
-    probe = ("from jeles import _egress\n"
-             "assert not _egress._OPENERS, 'opener built at import'\n")
+
+    probe = "from jeles import _egress\nassert not _egress._OPENERS, 'opener built at import'\n"
     assert subprocess.run([sys.executable, "-c", probe]).returncode == 0
 
 
@@ -170,6 +184,7 @@ def test_an_oversized_body_is_refused():
 def test_fetch_opens_and_reads_in_one_call(monkeypatch):
     """The shape is the point: a caller that never holds the response cannot
     forget to cap it. Six of eight egress sites in `sources` had forgotten."""
+
     class _R(io.BytesIO):
         def __enter__(self):
             return self
@@ -187,16 +202,23 @@ def test_fetch_opens_and_reads_in_one_call(monkeypatch):
 
     monkeypatch.setattr(urllib.request, "urlopen", fake)
 
-    assert _egress.fetch("https://example.org/x", allowed=_egress.HTTPS_ONLY,
-                         timeout=1, max_bytes=10_000,
-                         headers={"User-Agent": "ua"}, data=b"body") == b"z" * 5000
+    assert (
+        _egress.fetch(
+            "https://example.org/x",
+            allowed=_egress.HTTPS_ONLY,
+            timeout=1,
+            max_bytes=10_000,
+            headers={"User-Agent": "ua"},
+            data=b"body",
+        )
+        == b"z" * 5000
+    )
     assert seen["url"] == "https://example.org/x"
     assert seen["data"] == b"body"
     assert {k.lower(): v for k, v in seen["headers"].items()}["user-agent"] == "ua"
 
     with pytest.raises(ValueError, match="exceeds"):
-        _egress.fetch("https://example.org/x", allowed=_egress.HTTPS_ONLY,
-                      timeout=1, max_bytes=100)
+        _egress.fetch("https://example.org/x", allowed=_egress.HTTPS_ONLY, timeout=1, max_bytes=100)
 
 
 # ── Every egress lane goes through here ─────────────────────────────────────

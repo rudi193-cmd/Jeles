@@ -3,6 +3,7 @@
 No network: every test replaces urllib.request.urlopen with a canned response,
 so we verify the JSON→contract mapping and the fail-soft guarantee offline.
 """
+
 import io
 import json
 import urllib.error
@@ -23,6 +24,7 @@ class _Resp(io.BytesIO):
 
 def _stub_urlopen(monkeypatch, payload, *, capture=None):
     """Make urlopen return `payload` (dict→json bytes, or an Exception to raise)."""
+
     def fake(req, timeout=None):
         if capture is not None:
             capture["url"] = req.full_url
@@ -31,28 +33,50 @@ def _stub_urlopen(monkeypatch, payload, *, capture=None):
         if isinstance(payload, Exception):
             raise payload
         return _Resp(json.dumps(payload).encode())
+
     monkeypatch.setattr(sa.urllib.request, "urlopen", fake)
 
 
 def test_searxng_maps_results(monkeypatch):
     monkeypatch.setenv("JELES_SEARXNG_URL", "http://127.0.0.1:8888")
     cap = {}
-    _stub_urlopen(monkeypatch, {"results": [
-        {"title": "OPA bundles", "url": "https://openpolicyagent.org/x", "content": "signed"},
-        {"title": "Cedar", "url": "https://cedarpolicy.com/y", "content": "deterministic"},
-    ]}, capture=cap)
+    _stub_urlopen(
+        monkeypatch,
+        {
+            "results": [
+                {
+                    "title": "OPA bundles",
+                    "url": "https://openpolicyagent.org/x",
+                    "content": "signed",
+                },
+                {"title": "Cedar", "url": "https://cedarpolicy.com/y", "content": "deterministic"},
+            ]
+        },
+        capture=cap,
+    )
     hits = sa.make_searcher("searxng")("signed policy registry")
-    assert [h["url"] for h in hits] == ["https://openpolicyagent.org/x", "https://cedarpolicy.com/y"]
-    assert hits[0]["snippet"] == "signed"          # content -> snippet
+    assert [h["url"] for h in hits] == [
+        "https://openpolicyagent.org/x",
+        "https://cedarpolicy.com/y",
+    ]
+    assert hits[0]["snippet"] == "signed"  # content -> snippet
     assert "format=json" in cap["url"] and "127.0.0.1:8888" in cap["url"]
 
 
 def test_brave_maps_nested_results_and_sends_key(monkeypatch):
     monkeypatch.setenv("BRAVE_API_KEY", "secret-key")
     cap = {}
-    _stub_urlopen(monkeypatch, {"web": {"results": [
-        {"title": "t", "url": "https://a.org/1", "description": "d"},
-    ]}}, capture=cap)
+    _stub_urlopen(
+        monkeypatch,
+        {
+            "web": {
+                "results": [
+                    {"title": "t", "url": "https://a.org/1", "description": "d"},
+                ]
+            }
+        },
+        capture=cap,
+    )
     hits = sa.make_searcher("brave")("q")
     assert hits == [{"title": "t", "url": "https://a.org/1", "snippet": "d"}]
     # The key rides in a header, not the URL (urllib title-cases header names,
@@ -65,18 +89,24 @@ def test_brave_maps_nested_results_and_sends_key(monkeypatch):
 def test_tavily_posts_body(monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY", "tv-key")
     cap = {}
-    _stub_urlopen(monkeypatch, {"results": [
-        {"title": "t", "url": "https://b.org/2", "content": "c"},
-    ]}, capture=cap)
+    _stub_urlopen(
+        monkeypatch,
+        {
+            "results": [
+                {"title": "t", "url": "https://b.org/2", "content": "c"},
+            ]
+        },
+        capture=cap,
+    )
     hits = sa.make_searcher("tavily")("q")
     assert hits[0]["url"] == "https://b.org/2"
-    assert json.loads(cap["data"])["query"] == "q"     # POSTed, not in querystring
+    assert json.loads(cap["data"])["query"] == "q"  # POSTed, not in querystring
 
 
 def test_backend_that_fails_is_soft_empty(monkeypatch):
     monkeypatch.setenv("JELES_SEARXNG_URL", "http://127.0.0.1:8888")
     _stub_urlopen(monkeypatch, OSError("connection refused"))
-    assert sa.make_searcher("searxng")("q") == []      # never raises
+    assert sa.make_searcher("searxng")("q") == []  # never raises
 
 
 def test_missing_key_is_soft_empty(monkeypatch):
@@ -90,7 +120,7 @@ def test_default_backend_prefers_searxng_when_url_set(monkeypatch):
     monkeypatch.setenv("JELES_SEARXNG_URL", "http://127.0.0.1:8888")
     assert sa._default_backend_name() == "searxng"
     monkeypatch.delenv("JELES_SEARXNG_URL", raising=False)
-    assert sa._default_backend_name() == "ddg"          # keyless fallback
+    assert sa._default_backend_name() == "ddg"  # keyless fallback
 
 
 def test_unknown_backend_raises_at_construction(monkeypatch):
@@ -102,15 +132,28 @@ def test_end_to_end_react_with_stubbed_adapter(monkeypatch):
     """The adapter feeds react() exactly like the real thing — two independent
     domains from a stubbed SearXNG corroborate into a proposed nugget."""
     from jeles.reactions import conflict_scan as cs
+
     monkeypatch.setenv("JELES_SEARXNG_URL", "http://127.0.0.1:8888")
-    _stub_urlopen(monkeypatch, {"results": [
-        {"title": "OPA signed bundles", "url": "https://openpolicyagent.org/a",
-         "content": "a signed registry of reaction bundles"},
-        {"title": "Oso policy registry", "url": "https://osohq.com/b",
-         "content": "signed reaction registry prior art"},
-    ]})
-    proposals = cs.react({"claim": "signed reaction registry"},
-                         searcher=sa.make_searcher("searxng"))
+    _stub_urlopen(
+        monkeypatch,
+        {
+            "results": [
+                {
+                    "title": "OPA signed bundles",
+                    "url": "https://openpolicyagent.org/a",
+                    "content": "a signed registry of reaction bundles",
+                },
+                {
+                    "title": "Oso policy registry",
+                    "url": "https://osohq.com/b",
+                    "content": "signed reaction registry prior art",
+                },
+            ]
+        },
+    )
+    proposals = cs.react(
+        {"claim": "signed reaction registry"}, searcher=sa.make_searcher("searxng")
+    )
     assert proposals[0]["driver"] == "put_nugget"
     assert proposals[0]["args"]["verified_by"] == cs.WITNESS
 
@@ -149,8 +192,10 @@ def test_describe_backend_is_clean_when_properly_configured(monkeypatch):
 
 def test_describe_backend_makes_no_request(monkeypatch):
     """It answers "can this even work?" — asking must not cost a round trip."""
+
     def explode(*a, **k):
         raise AssertionError("describe_backend must not touch the network")
+
     monkeypatch.setattr(sa.urllib.request, "urlopen", explode)
     monkeypatch.setenv("JELES_SEARXNG_URL", "http://127.0.0.1:8888")
     assert sa.describe_backend("searxng")["configured"] is True
@@ -254,6 +299,7 @@ def _stub_urlopen_body(monkeypatch, body, *, capture=None):
     """Like `_stub_urlopen`, but for a raw HTML/text body (or an Exception to
     raise) instead of a JSON payload — the DDG backend posts and gets HTML back,
     not JSON."""
+
     def fake(req, timeout=None):
         if capture is not None:
             capture["url"] = req.full_url
@@ -263,6 +309,7 @@ def _stub_urlopen_body(monkeypatch, body, *, capture=None):
             raise body
         payload = body.encode() if isinstance(body, str) else body
         return _Resp(payload)
+
     monkeypatch.setattr(sa.urllib.request, "urlopen", fake)
 
 
@@ -271,7 +318,8 @@ def test_parse_ddg_html_unwraps_redirect_links_and_maps_snippets():
     ported from willow-2.0's `_parse_ddg_html`/`_unwrap_ddg`."""
     hits = sa._parse_ddg_html(_DDG_SERP_HTML, max_results=8)
     assert [h["url"] for h in hits] == [
-        "https://openpolicyagent.org/x", "https://osohq.com/b",
+        "https://openpolicyagent.org/x",
+        "https://osohq.com/b",
     ]
     assert all("duckduckgo.com" not in h["url"] for h in hits)
     assert hits[0]["title"] == "OPA signed bundles"
@@ -280,7 +328,7 @@ def test_parse_ddg_html_unwraps_redirect_links_and_maps_snippets():
 
 def test_looks_like_results_page_distinguishes_size_and_content():
     assert sa._looks_like_results_page("short") is False
-    assert sa._looks_like_results_page("x" * 3000) is False       # no "result"
+    assert sa._looks_like_results_page("x" * 3000) is False  # no "result"
     assert sa._looks_like_results_page("result " + "x" * 3000) is True
 
 
@@ -291,9 +339,10 @@ def test_ddg_html_backend_returns_real_serp_results(monkeypatch):
     _stub_urlopen_body(monkeypatch, _DDG_SERP_HTML, capture=cap)
     hits = sa.make_searcher("ddg")("signed policy registry")
     assert [h["url"] for h in hits] == [
-        "https://openpolicyagent.org/x", "https://osohq.com/b",
+        "https://openpolicyagent.org/x",
+        "https://osohq.com/b",
     ]
-    assert set(hits[0]) == {"title", "url", "snippet"}     # the Searcher contract
+    assert set(hits[0]) == {"title", "url", "snippet"}  # the Searcher contract
 
 
 def test_ddg_html_backend_posts_form_body_through_egress(monkeypatch):
@@ -339,7 +388,7 @@ def test_ddg_retryable_status_raises_transientsearcherror(monkeypatch):
 def test_ddg_html_backend_is_fail_soft_on_repeated_failure(monkeypatch):
     """Same guarantee as every other backend: conflict_scan must see `[]`,
     never an exception, however DDG fails."""
-    monkeypatch.setenv("JELES_SEARCH_MAX_ATTEMPTS", "1")   # no retry, fast test
+    monkeypatch.setenv("JELES_SEARCH_MAX_ATTEMPTS", "1")  # no retry, fast test
     _stub_urlopen_body(monkeypatch, OSError("connection refused"))
     assert sa.make_searcher("ddg")("q") == []
 
@@ -347,15 +396,16 @@ def test_ddg_html_backend_is_fail_soft_on_repeated_failure(monkeypatch):
 def test_ddg_html_backend_trips_its_breaker_after_repeated_failures(monkeypatch):
     """Enough consecutive failures open the breaker; the next call is refused
     locally — no network call at all — until the cooldown elapses."""
-    monkeypatch.setenv("JELES_SEARCH_MAX_ATTEMPTS", "1")     # no retry, fast test
+    monkeypatch.setenv("JELES_SEARCH_MAX_ATTEMPTS", "1")  # no retry, fast test
     monkeypatch.setenv("JELES_SEARCH_CB_THRESHOLD", "2")
-    monkeypatch.setenv("JELES_SEARCH_CB_COOLDOWN", "300")    # won't elapse mid-test
+    monkeypatch.setenv("JELES_SEARCH_CB_COOLDOWN", "300")  # won't elapse mid-test
 
     calls = {"n": 0}
 
     def fake(req, timeout=None):
         calls["n"] += 1
         raise OSError("connection refused")
+
     monkeypatch.setattr(sa.urllib.request, "urlopen", fake)
 
     search = sa.make_searcher("ddg")
@@ -374,8 +424,8 @@ def test_ddg_html_backend_search_with_status_reports_the_open_breaker(monkeypatc
     monkeypatch.setenv("JELES_SEARCH_CB_THRESHOLD", "1")
     _stub_urlopen_body(monkeypatch, OSError("boom"))
 
-    sa.search_with_status("q", "ddg")                 # trips the breaker
-    out = sa.search_with_status("q", "ddg")            # now refused locally
+    sa.search_with_status("q", "ddg")  # trips the breaker
+    out = sa.search_with_status("q", "ddg")  # now refused locally
     assert out["ok"] is False
     assert out["hits"] == []
     assert "circuit" in out["error"]
@@ -385,37 +435,37 @@ def test_circuit_breaker_opens_after_threshold_and_half_opens_after_cooldown():
     """Direct unit test of `CircuitBreaker` with an injectable clock — no real
     sleeping, no dependence on wall-clock timing."""
     clock = {"t": 0.0}
-    cb = sa.CircuitBreaker(fail_threshold=2, base_cooldown=10.0,
-                           clock=lambda: clock["t"])
+    cb = sa.CircuitBreaker(fail_threshold=2, base_cooldown=10.0, clock=lambda: clock["t"])
 
-    assert cb.allow() is True                          # CLOSED
+    assert cb.allow() is True  # CLOSED
     cb.record_failure()
     assert cb.state == "CLOSED" and cb.allow() is True  # one failure: still closed
     cb.record_failure()
     assert cb.state == "OPEN"
-    assert cb.allow() is False                          # cooldown not elapsed
+    assert cb.allow() is False  # cooldown not elapsed
 
     clock["t"] = 10.0
-    assert cb.allow() is True                            # cooldown elapsed -> HALF_OPEN
+    assert cb.allow() is True  # cooldown elapsed -> HALF_OPEN
     assert cb.state == "HALF_OPEN"
 
 
 def test_circuit_breaker_half_open_failure_doubles_the_cooldown():
     clock = {"t": 0.0}
-    cb = sa.CircuitBreaker(fail_threshold=1, base_cooldown=10.0, max_cooldown=100.0,
-                           clock=lambda: clock["t"])
+    cb = sa.CircuitBreaker(
+        fail_threshold=1, base_cooldown=10.0, max_cooldown=100.0, clock=lambda: clock["t"]
+    )
     cb.record_failure()
     assert cb.state == "OPEN"
 
     clock["t"] = 10.0
     assert cb.allow() is True and cb.state == "HALF_OPEN"
-    cb.record_failure()                                  # probe failed
+    cb.record_failure()  # probe failed
     assert cb.state == "OPEN"
-    assert cb.allow() is False                            # still within the new cooldown
+    assert cb.allow() is False  # still within the new cooldown
 
-    clock["t"] = 20.0                                      # 10s more: old cooldown, not new
+    clock["t"] = 20.0  # 10s more: old cooldown, not new
     assert cb.allow() is False
-    clock["t"] = 30.0                                       # 20s: the doubled cooldown
+    clock["t"] = 30.0  # 20s: the doubled cooldown
     assert cb.allow() is True
 
 
@@ -450,8 +500,14 @@ def test_with_retry_retries_a_transient_failure_then_succeeds():
             raise sa.TransientSearchError("503")
         return ["ok"]
 
-    result = sa._with_retry(attempt, max_attempts=3, budget=100.0, base_backoff=0.01,
-                            sleep=sleeps.append, clock=lambda: 0.0)
+    result = sa._with_retry(
+        attempt,
+        max_attempts=3,
+        budget=100.0,
+        base_backoff=0.01,
+        sleep=sleeps.append,
+        clock=lambda: 0.0,
+    )
     assert result == ["ok"]
     assert calls["n"] == 2
     assert len(sleeps) == 1, "one retry, so exactly one backoff sleep"

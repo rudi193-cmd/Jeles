@@ -92,6 +92,7 @@ the top-level 429 (rate limited, not "no citations"), comes back as
 that wants to *know* whether the check actually ran reads ``ok`` and
 ``configured``, never assumes a truthy return meant "verified".
 """
+
 from __future__ import annotations
 
 import json
@@ -126,8 +127,9 @@ _MAX_BYTES = int(os.environ.get("JELES_LEGAL_CITATIONS_MAX_BYTES", str(2 * 1024 
 _ALLOWED_SCHEMES = _egress.HTTPS_ONLY
 
 
-def _empty(*, ok: bool, configured: bool, reason: str,
-           citations: list | None = None) -> dict[str, Any]:
+def _empty(
+    *, ok: bool, configured: bool, reason: str, citations: list | None = None
+) -> dict[str, Any]:
     """The one result shape, whichever branch built it.
 
     Every return from :func:`verify_citations` — not-configured, guard-refused,
@@ -136,8 +138,12 @@ def _empty(*, ok: bool, configured: bool, reason: str,
     ``matched_count``), so a caller can read ``result["citations"]`` without
     first checking which branch produced the dict.
     """
-    return {"ok": ok, "configured": configured, "reason": reason,
-            "citations": citations if citations is not None else []}
+    return {
+        "ok": ok,
+        "configured": configured,
+        "reason": reason,
+        "citations": citations if citations is not None else [],
+    }
 
 
 def _cluster_field(cluster: dict[str, Any], *names: str) -> Any:
@@ -219,22 +225,28 @@ def verify_citations(text: str, *, token: str | None = None) -> dict[str, Any]:
     resolved_token = token or os.environ.get("COURTLISTENER_API_TOKEN", "")
     if not resolved_token:
         return _empty(
-            ok=False, configured=False,
-            reason=("no CourtListener API token — set COURTLISTENER_API_TOKEN "
-                    "or pass token=. Anonymous access is 5 requests/minute, "
-                    "easily exhausted, so this module makes no network call "
-                    "at all without one rather than degrade into tripping it."),
+            ok=False,
+            configured=False,
+            reason=(
+                "no CourtListener API token — set COURTLISTENER_API_TOKEN "
+                "or pass token=. Anonymous access is 5 requests/minute, "
+                "easily exhausted, so this module makes no network call "
+                "at all without one rather than degrade into tripping it."
+            ),
         )
 
     if len(text) > MAX_TEXT_CHARS:
         return _empty(
-            ok=False, configured=True,
-            reason=(f"text is {len(text)} characters, over CourtListener's "
-                    f"{MAX_TEXT_CHARS}-character limit for the citation-lookup "
-                    f"endpoint — refusing rather than silently truncating, "
-                    f"which could sever a citation mid-reporter or drop the "
-                    f"back half of the text and report a false-clean result. "
-                    f"Split the text and call again per chunk."),
+            ok=False,
+            configured=True,
+            reason=(
+                f"text is {len(text)} characters, over CourtListener's "
+                f"{MAX_TEXT_CHARS}-character limit for the citation-lookup "
+                f"endpoint — refusing rather than silently truncating, "
+                f"which could sever a citation mid-reporter or drop the "
+                f"back half of the text and report a false-clean result. "
+                f"Split the text and call again per chunk."
+            ),
         )
 
     body = urllib.parse.urlencode({"text": text}).encode("utf-8")
@@ -245,8 +257,12 @@ def verify_citations(text: str, *, token: str | None = None) -> dict[str, Any]:
 
     try:
         raw = _egress.fetch(
-            _ENDPOINT, allowed=_ALLOWED_SCHEMES, timeout=_TIMEOUT,
-            max_bytes=_MAX_BYTES, data=body, headers=headers,
+            _ENDPOINT,
+            allowed=_ALLOWED_SCHEMES,
+            timeout=_TIMEOUT,
+            max_bytes=_MAX_BYTES,
+            data=body,
+            headers=headers,
             allow_private=False,
         )
     except urllib.error.HTTPError as exc:

@@ -13,6 +13,7 @@ search the web *for the conflict* — the superseding or refuting prior art — 
 promote a finding to a nugget only when two independent sources corroborate it,
 holding it as a contested gap until then.
 """
+
 from __future__ import annotations
 
 from . import conflict_scan

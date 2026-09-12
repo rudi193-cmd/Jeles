@@ -107,10 +107,15 @@ from jeles.reactions import search_adapter
 #: them. The lesson generalises past this parameter: a required argument whose
 #: meaning is only in prose the model cannot read is a required argument the
 #: model will guess.
-AppId = Annotated[str, Field(description=(
-    "The calling application's own name, e.g. 'ask-jeles'. Identifies who is "
-    "calling. NOT the subject of the question or search."
-))]
+AppId = Annotated[
+    str,
+    Field(
+        description=(
+            "The calling application's own name, e.g. 'ask-jeles'. Identifies who is "
+            "calling. NOT the subject of the question or search."
+        )
+    ),
+]
 
 mcp = MCPServer(
     "jeles-corpus",
@@ -170,8 +175,7 @@ def _trust_tool_writes() -> bool:
     # Read per call, not at import: an env typo must not be able to stop the
     # server from starting, and a test (or an operator) must be able to change
     # it without reimporting the module.
-    return os.environ.get(TRUST_TOOL_WRITES_ENV, "").strip().lower() in {
-        "1", "true", "yes", "on"}
+    return os.environ.get(TRUST_TOOL_WRITES_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 @mcp.tool()
@@ -226,12 +230,15 @@ def corpus_put(
     """
     kind = "asserted"
     if _trust_tool_writes():
-        ok, _reason = _nestor_seal.verify_human_write(
-            question, answer, verified_by, evidence)
+        ok, _reason = _nestor_seal.verify_human_write(question, answer, verified_by, evidence)
         if ok:
             kind = "human"
-    kwargs: dict = {"tags": tags, "nugget_id": nugget_id,
-                    "verification_kind": kind, "written_by": app_id}
+    kwargs: dict = {
+        "tags": tags,
+        "nugget_id": nugget_id,
+        "verification_kind": kind,
+        "written_by": app_id,
+    }
     if evidence:
         # Carried regardless of whether it verified: an asserted nugget with a
         # signature that failed to check is still worth a reviewer's eyes, and
@@ -280,8 +287,7 @@ def corpus_resolve_gap(
     calling ``app_id`` so the record always says who closed it; pass a person's
     name when a person decided it.
     """
-    return corpus.resolve_gap(
-        gap_id, resolved_by=resolved_by or app_id, nugget_id=nugget_id)
+    return corpus.resolve_gap(gap_id, resolved_by=resolved_by or app_id, nugget_id=nugget_id)
 
 
 # ── The second hop: the open web ────────────────────────────────────────────
@@ -431,7 +437,8 @@ def corpus_institutional_search(
     only thing this hop is for. `source` names the publishing body.
     """
     out = institutional.search_institutional(
-        query, sources_filter=sources,
+        query,
+        sources_filter=sources,
         # Guarded before it leaves this process: `limit_per_source` is passed
         # down into `sources.py`, where each of the 65 source functions slices
         # its own results with a bare [:limit]. A negative value would reach
@@ -501,12 +508,24 @@ def corpus_fleet_status(app_id: AppId) -> dict:
 @mcp.tool()
 def corpus_verify_claim(
     app_id: AppId,
-    claim: Annotated[str, Field(description=(
-        "One factual claim, as a single sentence. Not a question, and not a "
-        "whole document - pass one claim per call."))],
-    sources: Annotated[list[str] | None, Field(description=(
-        "Optional: restrict the check to these registered source ids (see "
-        "corpus_sources). Omit to let the claim route itself."))] = None,
+    claim: Annotated[
+        str,
+        Field(
+            description=(
+                "One factual claim, as a single sentence. Not a question, and not a "
+                "whole document - pass one claim per call."
+            )
+        ),
+    ],
+    sources: Annotated[
+        list[str] | None,
+        Field(
+            description=(
+                "Optional: restrict the check to these registered source ids (see "
+                "corpus_sources). Omit to let the claim route itself."
+            )
+        ),
+    ] = None,
     limit: Annotated[int, Field(description="Results per source. Default 2.")] = 2,
 ) -> dict:
     """Check whether one claim is backed by a real institutional source, and
@@ -540,16 +559,21 @@ def corpus_verify_claim(
     claim is *findable*, which is the weakest of the three answers and the
     one worth asking first.
     """
-    return source_trail.verify_claim(
-        claim, sources=sources, limit=max(0, limit))
+    return source_trail.verify_claim(claim, sources=sources, limit=max(0, limit))
 
 
 @mcp.tool()
 def corpus_host_card(
     app_id: AppId,
-    host: Annotated[str, Field(description=(
-        "A hostname, e.g. 'api.crossref.org'. Just the host - not a full URL, "
-        "though a trailing dot and any capitalisation are tolerated."))],
+    host: Annotated[
+        str,
+        Field(
+            description=(
+                "A hostname, e.g. 'api.crossref.org'. Just the host - not a full URL, "
+                "though a trailing dot and any capitalisation are tolerated."
+            )
+        ),
+    ],
 ) -> dict:
     """Say what a hostname is: who publishes it, who holds custody, whose
     jurisdiction it sits in, and what roles it may play. Use it when you have

@@ -51,6 +51,7 @@ zero results is indistinguishable from the collection being empty:
                                rest: the source queries anonymously without it
                                and the key only lifts rate limits.
 """
+
 from __future__ import annotations
 
 import concurrent.futures as _cf
@@ -92,30 +93,50 @@ _UA = os.environ.get(
 
 # Confidence by source tier — primary institutions > peer-reviewed > aggregators
 _SOURCE_CONFIDENCE: dict[str, float] = {
-    "loc": 0.92, "met": 0.92, "cleveland": 0.92, "vam": 0.92,
-    "nasa": 0.92, "ndl": 0.92, "gallica": 0.92, "smithsonian": 0.92,
-    "pubmed": 0.90, "arxiv": 0.90, "crossref": 0.90, "europepmc": 0.90,
-    "openalex": 0.85, "core": 0.88, "doaj": 0.88, "hal": 0.88,
-    "zenodo": 0.65, "datacite": 0.88, "scielo": 0.88, "usgs": 0.90,
-    "europeana": 0.88, "rijksmuseum": 0.90,
-    "openlibrary": 0.82, "internet_archive": 0.80, "wikidata": 0.80,
-    "chronicling_america": 0.85, "dpla": 0.83, "semantic_scholar": 0.87,
+    "loc": 0.92,
+    "met": 0.92,
+    "cleveland": 0.92,
+    "vam": 0.92,
+    "nasa": 0.92,
+    "ndl": 0.92,
+    "gallica": 0.92,
+    "smithsonian": 0.92,
+    "pubmed": 0.90,
+    "arxiv": 0.90,
+    "crossref": 0.90,
+    "europepmc": 0.90,
+    "openalex": 0.85,
+    "core": 0.88,
+    "doaj": 0.88,
+    "hal": 0.88,
+    "zenodo": 0.65,
+    "datacite": 0.88,
+    "scielo": 0.88,
+    "usgs": 0.90,
+    "europeana": 0.88,
+    "rijksmuseum": 0.90,
+    "openlibrary": 0.82,
+    "internet_archive": 0.80,
+    "wikidata": 0.80,
+    "chronicling_america": 0.85,
+    "dpla": 0.83,
+    "semantic_scholar": 0.87,
     "pubchem": 0.92,
     "wikipedia": 0.60,
     "psychiatric_times": 0.75,
-    "inspirehep":     0.92,
-    "worldbank":      0.92,
-    "openfoodfacts":  0.82,
+    "inspirehep": 0.92,
+    "worldbank": 0.92,
+    "openfoodfacts": 0.82,
     "carbon_intensity": 0.92,
-    "nws":            0.92,
-    "gdelt":          0.65,
-    "who_gho":        0.95,
-    "open_meteo":     0.90,
-    "patentsview":    0.92,
-    "imf":            0.95,
-    "osf":            0.80,
-    "thesportsdb":    0.78,
-    "frankfurter":    0.95,
+    "nws": 0.92,
+    "gdelt": 0.65,
+    "who_gho": 0.95,
+    "open_meteo": 0.90,
+    "patentsview": 0.92,
+    "imf": 0.95,
+    "osf": 0.80,
+    "thesportsdb": 0.78,
+    "frankfurter": 0.95,
 }
 
 
@@ -208,8 +229,7 @@ def _read_capped(resp) -> bytes:
     return _egress.read_capped(resp, _MAX_BYTES)
 
 
-def _fetch(url: str, headers: dict | None = None,
-           timeout: float | None = None) -> bytes:
+def _fetch(url: str, headers: dict | None = None, timeout: float | None = None) -> bytes:
     """Open a URL and return its bounded body — opening and reading in one
     call, so there is no moment where a caller holds an unread response.
 
@@ -239,8 +259,7 @@ def _parse_xml(raw: bytes):
     return ET.fromstring(raw)  # nosec B314
 
 
-def _get(url: str, headers: dict | None = None,
-         timeout: float | None = None) -> dict | list | None:
+def _get(url: str, headers: dict | None = None, timeout: float | None = None) -> dict | list | None:
     """Fetch JSON. Returns None on any failure — a dead source is a missing
     source, never an exception that sinks the fan-out."""
     try:
@@ -256,8 +275,7 @@ def _get(url: str, headers: dict | None = None,
         return None
 
 
-def _get_html(url: str, headers: dict | None = None,
-              timeout: float | None = None) -> str | None:
+def _get_html(url: str, headers: dict | None = None, timeout: float | None = None) -> str | None:
     """Fetch text. Same contract as `_get`: None rather than a raise."""
     try:
         return _fetch(url, headers, timeout).decode("utf-8", errors="replace")
@@ -282,8 +300,15 @@ def _text(value) -> str:
     return str(value) if value is not None else ""
 
 
-def _result(title: str, url: str, source: str, institution: str,
-            snippet: str = "", date: str = "", rid: str = "") -> dict:
+def _result(
+    title: str,
+    url: str,
+    source: str,
+    institution: str,
+    snippet: str = "",
+    date: str = "",
+    rid: str = "",
+) -> dict:
     """Shape one hit into this module's citation dict.
 
     ``source`` here is the **registry key** — the adapter's own slug, e.g.
@@ -320,6 +345,7 @@ def _result(title: str, url: str, source: str, institution: str,
 
 # ── ACADEMIC ──────────────────────────────────────────────────────────────────
 
+
 def search_openalex(query: str, limit: int = 5) -> list[dict]:
     """OpenAlex — 200M+ scholarly works. No key required."""
     url = (
@@ -333,72 +359,73 @@ def search_openalex(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in (data.get("results") or [])[:limit]:
         doi = item.get("doi") or ""
-        results.append(_result(
-            title=item.get("display_name", ""),
-            url=doi if doi else item.get("id", ""),
-            source="openalex",
-            institution=", ".join(
-                i.get("display_name", "")
-                for a in (item.get("authorships") or [])[:2]
-                for i in (a.get("institutions") or [])[:1]
-            ),
-            snippet=item.get("abstract", "") or "",
-            date=str(item.get("publication_year", "")),
-            rid=item.get("id", "").split("/")[-1],
-        ))
+        results.append(
+            _result(
+                title=item.get("display_name", ""),
+                url=doi if doi else item.get("id", ""),
+                source="openalex",
+                institution=", ".join(
+                    i.get("display_name", "")
+                    for a in (item.get("authorships") or [])[:2]
+                    for i in (a.get("institutions") or [])[:1]
+                ),
+                snippet=item.get("abstract", "") or "",
+                date=str(item.get("publication_year", "")),
+                rid=item.get("id", "").split("/")[-1],
+            )
+        )
     return results
 
 
 def search_core(query: str, limit: int = 5) -> list[dict]:
     """CORE — open access full text. No key required."""
     url = (
-        "https://api.core.ac.uk/v3/search/works?q="
-        + urllib.parse.quote(query)
-        + f"&limit={limit}"
+        "https://api.core.ac.uk/v3/search/works?q=" + urllib.parse.quote(query) + f"&limit={limit}"
     )
     data = _get(url)
     if not data:
         return []
     results = []
     for item in (data.get("results") or [])[:limit]:
-        results.append(_result(
-            title=item.get("title", ""),
-            url=item.get("downloadUrl") or item.get("doi") or "",
-            source="core",
-            institution=item.get("publisher") or ", ".join(
-                j.get("title", "") for j in (item.get("journals") or [])[:1]
-            ),
-            snippet=item.get("abstract", "") or "",
-            date=str(item.get("yearPublished", "")),
-            rid=str(item.get("id", "")),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=item.get("downloadUrl") or item.get("doi") or "",
+                source="core",
+                institution=item.get("publisher")
+                or ", ".join(j.get("title", "") for j in (item.get("journals") or [])[:1]),
+                snippet=item.get("abstract", "") or "",
+                date=str(item.get("yearPublished", "")),
+                rid=str(item.get("id", "")),
+            )
+        )
     return results
 
 
 def search_doaj(query: str, limit: int = 5) -> list[dict]:
     """DOAJ — Directory of Open Access Journals. No key required."""
-    url = (
-        "https://doaj.org/api/search/articles/"
-        + urllib.parse.quote(query)
-        + f"?pageSize={limit}"
-    )
+    url = "https://doaj.org/api/search/articles/" + urllib.parse.quote(query) + f"?pageSize={limit}"
     data = _get(url)
     if not data:
         return []
     results = []
     for item in (data.get("results") or [])[:limit]:
         bib = item.get("bibjson") or {}
-        doi = next((i.get("id", "") for i in (bib.get("identifier") or []) if i.get("type") == "doi"), "")
+        doi = next(
+            (i.get("id", "") for i in (bib.get("identifier") or []) if i.get("type") == "doi"), ""
+        )
         link = next((item.get("url", "") for item in (bib.get("link") or [])), "")
-        results.append(_result(
-            title=bib.get("title", ""),
-            url=f"https://doi.org/{doi}" if doi else link,
-            source="doaj",
-            institution=(bib.get("journal") or {}).get("title", ""),
-            snippet=bib.get("abstract", "") or "",
-            date=f"{bib.get('year', '')}-{bib.get('month', '')}".strip("-"),
-            rid=doi,
-        ))
+        results.append(
+            _result(
+                title=bib.get("title", ""),
+                url=f"https://doi.org/{doi}" if doi else link,
+                source="doaj",
+                institution=(bib.get("journal") or {}).get("title", ""),
+                snippet=bib.get("abstract", "") or "",
+                date=f"{bib.get('year', '')}-{bib.get('month', '')}".strip("-"),
+                rid=doi,
+            )
+        )
     return results
 
 
@@ -416,15 +443,19 @@ def search_europepmc(query: str, limit: int = 5) -> list[dict]:
     for item in ((data.get("resultList") or {}).get("result") or [])[:limit]:
         pmid = item.get("pmid", "")
         doi = item.get("doi", "")
-        results.append(_result(
-            title=item.get("title", ""),
-            url=f"https://doi.org/{doi}" if doi else f"https://europepmc.org/article/{item.get('source','')}/{item.get('id','')}",
-            source="europepmc",
-            institution=item.get("journalTitle", ""),
-            snippet=item.get("abstractText", "") or "",
-            date=item.get("firstPublicationDate", ""),
-            rid=pmid or item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=f"https://doi.org/{doi}"
+                if doi
+                else f"https://europepmc.org/article/{item.get('source', '')}/{item.get('id', '')}",
+                source="europepmc",
+                institution=item.get("journalTitle", ""),
+                snippet=item.get("abstractText", "") or "",
+                date=item.get("firstPublicationDate", ""),
+                rid=pmid or item.get("id", ""),
+            )
+        )
     return results
 
 
@@ -444,25 +475,27 @@ def search_semantic_scholar(query: str, limit: int = 5) -> list[dict]:
     for item in (data.get("data") or [])[:limit]:
         ext = item.get("externalIds") or {}
         doi = ext.get("DOI", "")
-        results.append(_result(
-            title=item.get("title", ""),
-            url=f"https://doi.org/{doi}" if doi else item.get("url", ""),
-            source="semantic_scholar",
-            institution=", ".join(
-                a.get("name", "") for a in (item.get("authors") or [])[:3]
-            ),
-            snippet=item.get("abstract", "") or "",
-            date=str(item.get("year", "")),
-            rid=item.get("paperId", ""),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=f"https://doi.org/{doi}" if doi else item.get("url", ""),
+                source="semantic_scholar",
+                institution=", ".join(a.get("name", "") for a in (item.get("authors") or [])[:3]),
+                snippet=item.get("abstract", "") or "",
+                date=str(item.get("year", "")),
+                rid=item.get("paperId", ""),
+            )
+        )
     return results
 
 
 def search_crossref(query: str, limit: int = 5) -> list[dict]:
     """Crossref DOI registry — journals, books, conference papers. No key required."""
     url = (
-        "https://api.crossref.org/works?rows=" + str(limit)
-        + "&query=" + urllib.parse.quote(query)
+        "https://api.crossref.org/works?rows="
+        + str(limit)
+        + "&query="
+        + urllib.parse.quote(query)
         + f"&mailto={urllib.parse.quote(_CONTACT_EMAIL)}"
     )
     data = _get(url)
@@ -473,18 +506,21 @@ def search_crossref(query: str, limit: int = 5) -> list[dict]:
     for item in items[:limit]:
         doi = item.get("DOI", "")
         titles = item.get("title") or [""]
-        date_parts = ((item.get("published") or item.get("issued") or {})
-                      .get("date-parts") or [[]])[0]
+        date_parts = (
+            (item.get("published") or item.get("issued") or {}).get("date-parts") or [[]]
+        )[0]
         date = "-".join(str(p) for p in date_parts) if date_parts else ""
-        results.append(_result(
-            title=titles[0] if titles else "",
-            url=f"https://doi.org/{doi}" if doi else "",
-            source="crossref",
-            institution=item.get("publisher", ""),
-            snippet=(item.get("abstract") or "")[:400],
-            date=date,
-            rid=doi,
-        ))
+        results.append(
+            _result(
+                title=titles[0] if titles else "",
+                url=f"https://doi.org/{doi}" if doi else "",
+                source="crossref",
+                institution=item.get("publisher", ""),
+                snippet=(item.get("abstract") or "")[:400],
+                date=date,
+                rid=doi,
+            )
+        )
     return results
 
 
@@ -492,8 +528,10 @@ def search_pubmed(query: str, limit: int = 5) -> list[dict]:
     """PubMed biomedical literature. No key required."""
     search_url = (
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-        "?db=pubmed&retmode=json&retmax=" + str(limit)
-        + "&term=" + urllib.parse.quote(query)
+        "?db=pubmed&retmode=json&retmax="
+        + str(limit)
+        + "&term="
+        + urllib.parse.quote(query)
         + f"&tool={urllib.parse.quote(_NCBI_TOOL)}"
         + f"&email={urllib.parse.quote(_CONTACT_EMAIL)}"
     )
@@ -505,7 +543,8 @@ def search_pubmed(query: str, limit: int = 5) -> list[dict]:
         return []
     summary_url = (
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-        "?db=pubmed&retmode=json&id=" + ",".join(ids)
+        "?db=pubmed&retmode=json&id="
+        + ",".join(ids)
         + f"&tool={urllib.parse.quote(_NCBI_TOOL)}"
         + f"&email={urllib.parse.quote(_CONTACT_EMAIL)}"
     )
@@ -517,15 +556,17 @@ def search_pubmed(query: str, limit: int = 5) -> list[dict]:
         doc = (summary.get("result") or {}).get(pmid) or {}
         if not doc or pmid == "uids":
             continue
-        results.append(_result(
-            title=doc.get("title", ""),
-            url=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-            source="pubmed",
-            institution="PubMed / National Library of Medicine",
-            snippet=", ".join(a.get("name", "") for a in (doc.get("authors") or [])[:3]),
-            date=doc.get("pubdate", ""),
-            rid=pmid,
-        ))
+        results.append(
+            _result(
+                title=doc.get("title", ""),
+                url=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                source="pubmed",
+                institution="PubMed / National Library of Medicine",
+                snippet=", ".join(a.get("name", "") for a in (doc.get("authors") or [])[:3]),
+                date=doc.get("pubdate", ""),
+                rid=pmid,
+            )
+        )
     return results
 
 
@@ -549,27 +590,26 @@ def search_arxiv(query: str, limit: int = 5) -> list[dict]:
     results = []
     for entry in root.findall("atom:entry", ns)[:limit]:
         arxiv_id = (entry.findtext("atom:id", "", ns) or "").split("/abs/")[-1]
-        results.append(_result(
-            title=(entry.findtext("atom:title", "", ns) or "").strip(),
-            url=entry.findtext("atom:id", "", ns) or "",
-            source="arxiv",
-            institution="arXiv / Cornell University",
-            snippet=(entry.findtext("atom:summary", "", ns) or "").strip(),
-            date=entry.findtext("atom:published", "", ns) or "",
-            rid=arxiv_id,
-        ))
+        results.append(
+            _result(
+                title=(entry.findtext("atom:title", "", ns) or "").strip(),
+                url=entry.findtext("atom:id", "", ns) or "",
+                source="arxiv",
+                institution="arXiv / Cornell University",
+                snippet=(entry.findtext("atom:summary", "", ns) or "").strip(),
+                date=entry.findtext("atom:published", "", ns) or "",
+                rid=arxiv_id,
+            )
+        )
     return results
 
 
 # ── DATA / SCIENCE ────────────────────────────────────────────────────────────
 
+
 def search_zenodo(query: str, limit: int = 5) -> list[dict]:
     """Zenodo — CERN open research repository. No key required."""
-    url = (
-        "https://zenodo.org/api/records?q="
-        + urllib.parse.quote(query)
-        + f"&size={limit}"
-    )
+    url = "https://zenodo.org/api/records?q=" + urllib.parse.quote(query) + f"&size={limit}"
     data = _get(url)
     if not data:
         return []
@@ -577,38 +617,38 @@ def search_zenodo(query: str, limit: int = 5) -> list[dict]:
     for item in (data.get("hits", {}).get("hits") or [])[:limit]:
         meta = item.get("metadata", {})
         doi = meta.get("doi", "")
-        results.append(_result(
-            title=meta.get("title", ""),
-            url=f"https://doi.org/{doi}" if doi else item.get("links", {}).get("html", ""),
-            source="zenodo",
-            # Always the repository, never the record's owner. Zenodo's
-            # `owners` is a list of *dicts* (`{"id": "1342605"}`), so `[0]`
-            # handed a dict to a parameter `_result` declares as `str`. It did
-            # not crash, which is why it survived: `_text` coerces with
-            # `str(value)`, so the institution became the literal text
-            # "{'id': '1342605'}". That is worse than a crash for the one job
-            # this field has — `verify._identity` counts `institution` to
-            # decide corroboration, so every Zenodo record with an owner
-            # contributed a distinct "institution" whose name is a rendered
-            # dict, and two records by different owners looked like two
-            # independent institutions agreeing.
-            # It was wrong in intent too. An owner id names a *user account*.
-            # `institution` answers "who backs this", and for a Zenodo record
-            # that is the repository that published it.
-            institution="Zenodo / CERN",
-            snippet=meta.get("description", "") or "",
-            date=meta.get("publication_date", ""),
-            rid=doi or str(item.get("id", "")),
-        ))
+        results.append(
+            _result(
+                title=meta.get("title", ""),
+                url=f"https://doi.org/{doi}" if doi else item.get("links", {}).get("html", ""),
+                source="zenodo",
+                # Always the repository, never the record's owner. Zenodo's
+                # `owners` is a list of *dicts* (`{"id": "1342605"}`), so `[0]`
+                # handed a dict to a parameter `_result` declares as `str`. It did
+                # not crash, which is why it survived: `_text` coerces with
+                # `str(value)`, so the institution became the literal text
+                # "{'id': '1342605'}". That is worse than a crash for the one job
+                # this field has — `verify._identity` counts `institution` to
+                # decide corroboration, so every Zenodo record with an owner
+                # contributed a distinct "institution" whose name is a rendered
+                # dict, and two records by different owners looked like two
+                # independent institutions agreeing.
+                # It was wrong in intent too. An owner id names a *user account*.
+                # `institution` answers "who backs this", and for a Zenodo record
+                # that is the repository that published it.
+                institution="Zenodo / CERN",
+                snippet=meta.get("description", "") or "",
+                date=meta.get("publication_date", ""),
+                rid=doi or str(item.get("id", "")),
+            )
+        )
     return results
 
 
 def search_datacite(query: str, limit: int = 5) -> list[dict]:
     """DataCite — DOI registry for research data. No key required."""
     url = (
-        "https://api.datacite.org/dois?query="
-        + urllib.parse.quote(query)
-        + f"&page[size]={limit}"
+        "https://api.datacite.org/dois?query=" + urllib.parse.quote(query) + f"&page[size]={limit}"
     )
     data = _get(url)
     if not data:
@@ -619,17 +659,19 @@ def search_datacite(query: str, limit: int = 5) -> list[dict]:
         doi = attrs.get("doi", "")
         titles = attrs.get("titles") or [{}]
         creators = attrs.get("creators") or []
-        results.append(_result(
-            title=titles[0].get("title", "") if titles else "",
-            url=f"https://doi.org/{doi}" if doi else "",
-            source="datacite",
-            institution=", ".join(c.get("name", "") for c in creators[:2]),
-            snippet=", ".join(
-                d.get("description", "") for d in (attrs.get("descriptions") or [])[:1]
-            ),
-            date=(attrs.get("publicationYear") or ""),
-            rid=doi,
-        ))
+        results.append(
+            _result(
+                title=titles[0].get("title", "") if titles else "",
+                url=f"https://doi.org/{doi}" if doi else "",
+                source="datacite",
+                institution=", ".join(c.get("name", "") for c in creators[:2]),
+                snippet=", ".join(
+                    d.get("description", "") for d in (attrs.get("descriptions") or [])[:1]
+                ),
+                date=(attrs.get("publicationYear") or ""),
+                rid=doi,
+            )
+        )
     return results
 
 
@@ -637,8 +679,7 @@ def search_wikidata(query: str, limit: int = 5) -> list[dict]:
     """Wikidata — structured linked open data (NOT Wikipedia). Citable as structured data source."""
     url = (
         "https://www.wikidata.org/w/api.php?action=wbsearchentities"
-        "&search=" + urllib.parse.quote(query)
-        + f"&language=en&format=json&limit={limit}"
+        "&search=" + urllib.parse.quote(query) + f"&language=en&format=json&limit={limit}"
     )
     data = _get(url)
     if not data:
@@ -646,15 +687,17 @@ def search_wikidata(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in (data.get("search") or [])[:limit]:
         qid = item.get("id", "")
-        results.append(_result(
-            title=item.get("label", ""),
-            url=item.get("concepturi", f"https://www.wikidata.org/wiki/{qid}"),
-            source="wikidata",
-            institution="Wikidata / Wikimedia Foundation",
-            snippet=item.get("description", ""),
-            date="",
-            rid=qid,
-        ))
+        results.append(
+            _result(
+                title=item.get("label", ""),
+                url=item.get("concepturi", f"https://www.wikidata.org/wiki/{qid}"),
+                source="wikidata",
+                institution="Wikidata / Wikimedia Foundation",
+                snippet=item.get("description", ""),
+                date="",
+                rid=qid,
+            )
+        )
     return results
 
 
@@ -671,19 +714,23 @@ def search_pubchem(query: str, limit: int = 5) -> list[dict]:
     results = []
     for compound in (data.get("PC_Compounds") or [])[:limit]:
         cid = compound.get("id", {}).get("id", {}).get("cid", "")
-        props = {p.get("urn", {}).get("label", ""): p.get("value", {})
-                 for p in (compound.get("props") or [])}
+        props = {
+            p.get("urn", {}).get("label", ""): p.get("value", {})
+            for p in (compound.get("props") or [])
+        }
         iupac = props.get("IUPAC Name", {}).get("sval", "")
         formula = props.get("Molecular Formula", {}).get("sval", "")
-        results.append(_result(
-            title=iupac or query,
-            url=f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}",
-            source="pubchem",
-            institution="PubChem / NCBI",
-            snippet=f"Formula: {formula}" if formula else "",
-            date="",
-            rid=str(cid),
-        ))
+        results.append(
+            _result(
+                title=iupac or query,
+                url=f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}",
+                source="pubchem",
+                institution="PubChem / NCBI",
+                snippet=f"Formula: {formula}" if formula else "",
+                date="",
+                rid=str(cid),
+            )
+        )
     return results
 
 
@@ -700,24 +747,24 @@ def search_usgs(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in (data.get("records") or [])[:limit]:
         doi = item.get("doi", "")
-        results.append(_result(
-            title=item.get("title", ""),
-            url=f"https://doi.org/{doi}" if doi else item.get("links", [{}])[0].get("url", ""),
-            source="usgs",
-            institution="U.S. Geological Survey",
-            snippet=item.get("docAbstract", "") or "",
-            date=str(item.get("publicationYear", "")),
-            rid=doi or str(item.get("id", "")),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=f"https://doi.org/{doi}" if doi else item.get("links", [{}])[0].get("url", ""),
+                source="usgs",
+                institution="U.S. Geological Survey",
+                snippet=item.get("docAbstract", "") or "",
+                date=str(item.get("publicationYear", "")),
+                rid=doi or str(item.get("id", "")),
+            )
+        )
     return results
 
 
 def search_nasa(query: str, limit: int = 5) -> list[dict]:
     """NASA Image & Video Library. No key required."""
     url = (
-        "https://images-api.nasa.gov/search?q="
-        + urllib.parse.quote(query)
-        + f"&page_size={limit}"
+        "https://images-api.nasa.gov/search?q=" + urllib.parse.quote(query) + f"&page_size={limit}"
     )
     data = _get(url)
     if not data:
@@ -727,19 +774,22 @@ def search_nasa(query: str, limit: int = 5) -> list[dict]:
     for item in items[:limit]:
         data_block = (item.get("data") or [{}])[0]
         links = item.get("links") or [{}]
-        results.append(_result(
-            title=data_block.get("title", ""),
-            url=links[0].get("href", "") if links else "",
-            source="nasa",
-            institution="NASA",
-            snippet=data_block.get("description", ""),
-            date=data_block.get("date_created", "")[:10],
-            rid=data_block.get("nasa_id", ""),
-        ))
+        results.append(
+            _result(
+                title=data_block.get("title", ""),
+                url=links[0].get("href", "") if links else "",
+                source="nasa",
+                institution="NASA",
+                snippet=data_block.get("description", ""),
+                date=data_block.get("date_created", "")[:10],
+                rid=data_block.get("nasa_id", ""),
+            )
+        )
     return results
 
 
 # ── MUSEUMS ───────────────────────────────────────────────────────────────────
+
 
 def search_met(query: str, limit: int = 5) -> list[dict]:
     """Metropolitan Museum of Art — open access collection. No key required."""
@@ -757,15 +807,19 @@ def search_met(query: str, limit: int = 5) -> list[dict]:
         obj = _get(f"https://collectionapi.metmuseum.org/public/collection/v1/objects/{oid}")
         if not obj:
             continue
-        results.append(_result(
-            title=obj.get("title", ""),
-            url=obj.get("objectURL", ""),
-            source="met",
-            institution="Metropolitan Museum of Art",
-            snippet=f"{obj.get('artistDisplayName', '')} — {obj.get('objectDate', '')} — {obj.get('medium', '')}".strip(" —"),
-            date=obj.get("objectDate", ""),
-            rid=str(oid),
-        ))
+        results.append(
+            _result(
+                title=obj.get("title", ""),
+                url=obj.get("objectURL", ""),
+                source="met",
+                institution="Metropolitan Museum of Art",
+                snippet=f"{obj.get('artistDisplayName', '')} — {obj.get('objectDate', '')} — {obj.get('medium', '')}".strip(
+                    " —"
+                ),
+                date=obj.get("objectDate", ""),
+                rid=str(oid),
+            )
+        )
     return results
 
 
@@ -781,15 +835,19 @@ def search_cleveland(query: str, limit: int = 5) -> list[dict]:
         return []
     results = []
     for item in (data.get("data") or [])[:limit]:
-        results.append(_result(
-            title=item.get("title", ""),
-            url=item.get("url", ""),
-            source="cleveland",
-            institution="Cleveland Museum of Art",
-            snippet=f"{', '.join(c.get('description','') for c in (item.get('creators') or [])[:2])} — {item.get('creation_date','')}".strip(" —"),
-            date=item.get("creation_date", ""),
-            rid=str(item.get("id", "")),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=item.get("url", ""),
+                source="cleveland",
+                institution="Cleveland Museum of Art",
+                snippet=f"{', '.join(c.get('description', '') for c in (item.get('creators') or [])[:2])} — {item.get('creation_date', '')}".strip(
+                    " —"
+                ),
+                date=item.get("creation_date", ""),
+                rid=str(item.get("id", "")),
+            )
+        )
     return results
 
 
@@ -806,15 +864,19 @@ def search_vam(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in (data.get("records") or [])[:limit]:
         sys_num = item.get("systemNumber", "")
-        results.append(_result(
-            title=item.get("_primaryTitle", ""),
-            url=f"https://collections.vam.ac.uk/item/{sys_num}/",
-            source="vam",
-            institution="Victoria & Albert Museum",
-            snippet=f"{item.get('_primaryMaker',{}).get('name','')} — {item.get('_primaryDate','')}".strip(" —"),
-            date=item.get("_primaryDate", ""),
-            rid=sys_num,
-        ))
+        results.append(
+            _result(
+                title=item.get("_primaryTitle", ""),
+                url=f"https://collections.vam.ac.uk/item/{sys_num}/",
+                source="vam",
+                institution="Victoria & Albert Museum",
+                snippet=f"{item.get('_primaryMaker', {}).get('name', '')} — {item.get('_primaryDate', '')}".strip(
+                    " —"
+                ),
+                date=item.get("_primaryDate", ""),
+                rid=sys_num,
+            )
+        )
     return results
 
 
@@ -834,25 +896,29 @@ def search_rijksmuseum(query: str, limit: int = 5) -> list[dict]:
         return []
     results = []
     for item in (data.get("artObjects") or [])[:limit]:
-        results.append(_result(
-            title=item.get("title", ""),
-            url=item.get("links", {}).get("web", ""),
-            source="rijksmuseum",
-            institution="Rijksmuseum",
-            snippet=item.get("longTitle", ""),
-            date=str(item.get("dating", {}).get("sortingDate", "")),
-            rid=item.get("objectNumber", ""),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=item.get("links", {}).get("web", ""),
+                source="rijksmuseum",
+                institution="Rijksmuseum",
+                snippet=item.get("longTitle", ""),
+                date=str(item.get("dating", {}).get("sortingDate", "")),
+                rid=item.get("objectNumber", ""),
+            )
+        )
     return results
 
 
 # ── INTERNATIONAL ─────────────────────────────────────────────────────────────
 
+
 def search_gallica(query: str, limit: int = 5) -> list[dict]:
     """Gallica (BnF) — Bibliothèque nationale de France digital collections. No key required."""
     url = (
         "https://gallica.bnf.fr/SRU?operation=searchRetrieve"
-        "&query=dc.subject+all+" + urllib.parse.quote(f'"{query}"')
+        "&query=dc.subject+all+"
+        + urllib.parse.quote(f'"{query}"')
         + f"&maximumRecords={limit}&version=1.2"
     )
     try:
@@ -873,15 +939,17 @@ def search_gallica(query: str, limit: int = 5) -> list[dict]:
         dates = record.findall(f"{{{ns_dc}}}date")
         descriptions = record.findall(f"{{{ns_dc}}}description")
         url_val = next((i.text for i in identifiers if i.text and i.text.startswith("http")), "")
-        results.append(_result(
-            title=titles[0].text if titles else "",
-            url=url_val,
-            source="gallica",
-            institution="Gallica / Bibliothèque nationale de France",
-            snippet=descriptions[0].text if descriptions else "",
-            date=dates[0].text if dates else "",
-            rid=url_val.split("/")[-1] if url_val else "",
-        ))
+        results.append(
+            _result(
+                title=titles[0].text if titles else "",
+                url=url_val,
+                source="gallica",
+                institution="Gallica / Bibliothèque nationale de France",
+                snippet=descriptions[0].text if descriptions else "",
+                date=dates[0].text if dates else "",
+                rid=url_val.split("/")[-1] if url_val else "",
+            )
+        )
     return results[:limit]
 
 
@@ -898,24 +966,25 @@ def search_hal(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in ((data.get("response") or {}).get("docs") or [])[:limit]:
         titles = item.get("title_s") or [""]
-        results.append(_result(
-            title=titles[0] if titles else "",
-            url=item.get("uri_s", ""),
-            source="hal",
-            institution=item.get("journalTitle_s", "HAL / archives-ouvertes.fr"),
-            snippet=", ".join(item.get("authFullName_s") or []),
-            date=(item.get("producedDate_tdate") or "")[:10],
-            rid=item.get("uri_s", "").split("/")[-1],
-        ))
+        results.append(
+            _result(
+                title=titles[0] if titles else "",
+                url=item.get("uri_s", ""),
+                source="hal",
+                institution=item.get("journalTitle_s", "HAL / archives-ouvertes.fr"),
+                snippet=", ".join(item.get("authFullName_s") or []),
+                date=(item.get("producedDate_tdate") or "")[:10],
+                rid=item.get("uri_s", "").split("/")[-1],
+            )
+        )
     return results
 
 
 def search_scielo(query: str, limit: int = 5) -> list[dict]:
     """SciELO — Latin American, Iberian & South African science. OAI-PMH, no key required."""
     # Use ArticleMeta search (JSON) for keyword search
-    url = (
-        "https://articlemeta.scielo.org/api/v1/article/identifiers/"
-        "?collection=scl&limit=" + str(limit)
+    url = "https://articlemeta.scielo.org/api/v1/article/identifiers/?collection=scl&limit=" + str(
+        limit
     )
     data = _get(url)
     if not data:
@@ -928,19 +997,21 @@ def search_scielo(query: str, limit: int = 5) -> list[dict]:
             continue
         # SciELO uses internal ISIS field codes; v977=title, v10=authors, v30=journal
         title = ""
-        for section in (art.get("article", {}).get("v977") or []):
+        for section in art.get("article", {}).get("v977") or []:
             title = section.get("_", "")
             if title:
                 break
-        results.append(_result(
-            title=title,
-            url=f"https://www.scielo.br/j/{pid.split('S')[1][:4].lower()}/a/{pid}/",
-            source="scielo",
-            institution="SciELO / FAPESP",
-            snippet="",
-            date="",
-            rid=pid,
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://www.scielo.br/j/{pid.split('S')[1][:4].lower()}/a/{pid}/",
+                source="scielo",
+                institution="SciELO / FAPESP",
+                snippet="",
+                date="",
+                rid=pid,
+            )
+        )
     return [r for r in results if r["title"]]
 
 
@@ -948,7 +1019,8 @@ def search_ndl(query: str, limit: int = 5) -> list[dict]:
     """National Diet Library (Japan) — largest library in Japan. SRU, no key required."""
     url = (
         "https://iss.ndl.go.jp/api/sru?operation=searchRetrieve"
-        "&query=title%3D" + urllib.parse.quote(f'"{query}"')
+        "&query=title%3D"
+        + urllib.parse.quote(f'"{query}"')
         + f"&maximumRecords={limit}&recordSchema=dcndl"
     )
     try:
@@ -964,50 +1036,57 @@ def search_ndl(query: str, limit: int = 5) -> list[dict]:
     ns_dcterms = "http://purl.org/dc/terms/"
     results = []
     for record in root.findall(".//{http://www.loc.gov/zing/srw/}recordData"):
-        titles = record.findall(f".//{{{ns_dcterms}}}title") or record.findall(f".//{{{ns_dc}}}title")
-        dates = record.findall(f".//{{{ns_dcterms}}}issued") or record.findall(f".//{{{ns_dc}}}date")
-        publishers = record.findall(f".//{{{ns_dcterms}}}publisher") or record.findall(f".//{{{ns_dc}}}publisher")
+        titles = record.findall(f".//{{{ns_dcterms}}}title") or record.findall(
+            f".//{{{ns_dc}}}title"
+        )
+        dates = record.findall(f".//{{{ns_dcterms}}}issued") or record.findall(
+            f".//{{{ns_dc}}}date"
+        )
+        publishers = record.findall(f".//{{{ns_dcterms}}}publisher") or record.findall(
+            f".//{{{ns_dc}}}publisher"
+        )
         ids = record.findall(f".//{{{ns_dc}}}identifier")
         url_val = next((i.text for i in ids if i.text and i.text.startswith("http")), "")
         title_text = titles[0].text if titles else ""
         if not title_text:
             continue
-        results.append(_result(
-            title=title_text,
-            url=url_val,
-            source="ndl",
-            institution="National Diet Library / Japan",
-            snippet=publishers[0].text if publishers else "",
-            date=dates[0].text if dates else "",
-            rid=url_val.split("/")[-1] if url_val else "",
-        ))
+        results.append(
+            _result(
+                title=title_text,
+                url=url_val,
+                source="ndl",
+                institution="National Diet Library / Japan",
+                snippet=publishers[0].text if publishers else "",
+                date=dates[0].text if dates else "",
+                rid=url_val.split("/")[-1] if url_val else "",
+            )
+        )
     return results[:limit]
 
 
 # ── LIBRARIES & ARCHIVES ──────────────────────────────────────────────────────
 
+
 def search_loc(query: str, limit: int = 5) -> list[dict]:
     """Library of Congress digital collections. No key required."""
-    url = (
-        "https://www.loc.gov/search/?q="
-        + urllib.parse.quote(query)
-        + f"&fo=json&c={limit}"
-    )
+    url = "https://www.loc.gov/search/?q=" + urllib.parse.quote(query) + f"&fo=json&c={limit}"
     data = _get(url)
     if not data:
         return []
     results = []
     for item in (data.get("results") or [])[:limit]:
         desc = item.get("description", "")
-        results.append(_result(
-            title=item.get("title", ""),
-            url=item.get("url", ""),
-            source="loc",
-            institution="Library of Congress",
-            snippet=desc[0] if isinstance(desc, list) else desc,
-            date=item.get("date", ""),
-            rid=item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=item.get("url", ""),
+                source="loc",
+                institution="Library of Congress",
+                snippet=desc[0] if isinstance(desc, list) else desc,
+                date=item.get("date", ""),
+                rid=item.get("id", ""),
+            )
+        )
     return results
 
 
@@ -1024,15 +1103,17 @@ def search_openlibrary(query: str, limit: int = 5) -> list[dict]:
     results = []
     for doc in (data.get("docs") or [])[:limit]:
         key = doc.get("key", "")
-        results.append(_result(
-            title=doc.get("title", ""),
-            url=f"https://openlibrary.org{key}" if key else "",
-            source="openlibrary",
-            institution="Open Library / Internet Archive",
-            snippet=", ".join(doc.get("author_name") or []),
-            date=str(doc.get("first_publish_year", "")),
-            rid=key,
-        ))
+        results.append(
+            _result(
+                title=doc.get("title", ""),
+                url=f"https://openlibrary.org{key}" if key else "",
+                source="openlibrary",
+                institution="Open Library / Internet Archive",
+                snippet=", ".join(doc.get("author_name") or []),
+                date=str(doc.get("first_publish_year", "")),
+                rid=key,
+            )
+        )
     return results
 
 
@@ -1057,15 +1138,17 @@ def search_chronicling_america(query: str, limit: int = 5) -> list[dict]:
         return []
     results = []
     for item in (data.get("results") or [])[:limit]:
-        results.append(_result(
-            title=item.get("title", ""),
-            url=item.get("url") or item.get("id") or "",
-            source="chronicling_america",
-            institution="Chronicling America (Library of Congress)",
-            snippet=item.get("description", "") or "",
-            date=item.get("date", ""),
-            rid=item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=item.get("url") or item.get("id") or "",
+                source="chronicling_america",
+                institution="Chronicling America (Library of Congress)",
+                snippet=item.get("description", "") or "",
+                date=item.get("date", ""),
+                rid=item.get("id", ""),
+            )
+        )
     return results
 
 
@@ -1086,15 +1169,23 @@ def search_dpla(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in (data.get("docs") or [])[:limit]:
         src = item.get("sourceResource", {})
-        results.append(_result(
-            title=(src.get("title") or [""])[0] if isinstance(src.get("title"), list) else src.get("title", ""),
-            url=item.get("isShownAt", ""),
-            source="dpla",
-            institution=item.get("dataProvider", ""),
-            snippet=(src.get("description") or [""])[0] if isinstance(src.get("description"), list) else src.get("description", ""),
-            date=(src.get("date") or {}).get("displayDate", "") if isinstance(src.get("date"), dict) else "",
-            rid=item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=(src.get("title") or [""])[0]
+                if isinstance(src.get("title"), list)
+                else src.get("title", ""),
+                url=item.get("isShownAt", ""),
+                source="dpla",
+                institution=item.get("dataProvider", ""),
+                snippet=(src.get("description") or [""])[0]
+                if isinstance(src.get("description"), list)
+                else src.get("description", ""),
+                date=(src.get("date") or {}).get("displayDate", "")
+                if isinstance(src.get("date"), dict)
+                else "",
+                rid=item.get("id", ""),
+            )
+        )
     return results
 
 
@@ -1111,19 +1202,22 @@ def search_internet_archive(query: str, limit: int = 5) -> list[dict]:
     results = []
     for doc in ((data.get("response") or {}).get("docs") or [])[:limit]:
         identifier = doc.get("identifier", "")
-        results.append(_result(
-            title=doc.get("title", ""),
-            url=f"https://archive.org/details/{identifier}" if identifier else "",
-            source="internet_archive",
-            institution="Internet Archive",
-            snippet=doc.get("description", "") or "",
-            date=str(doc.get("date", "")),
-            rid=identifier,
-        ))
+        results.append(
+            _result(
+                title=doc.get("title", ""),
+                url=f"https://archive.org/details/{identifier}" if identifier else "",
+                source="internet_archive",
+                institution="Internet Archive",
+                snippet=doc.get("description", "") or "",
+                date=str(doc.get("date", "")),
+                rid=identifier,
+            )
+        )
     return results
 
 
 # ── HERITAGE ──────────────────────────────────────────────────────────────────
+
 
 def search_smithsonian(query: str, limit: int = 5) -> list[dict]:
     """Smithsonian Open Access. Requires SMITHSONIAN_API_KEY env var."""
@@ -1142,32 +1236,37 @@ def search_smithsonian(query: str, limit: int = 5) -> list[dict]:
     results = []
     for row in ((data.get("response") or {}).get("rows") or [])[:limit]:
         desc = row.get("content", {}).get("descriptiveNonRepeating", {})
-        results.append(_result(
-            title=row.get("title", ""),
-            url=desc.get("record_link", ""),
-            source="smithsonian",
-            institution="Smithsonian Institution",
-            snippet="",
-            date=row.get("content", {}).get("indexedStructured", {}).get("date", [""])[0],
-            rid=row.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=row.get("title", ""),
+                url=desc.get("record_link", ""),
+                source="smithsonian",
+                institution="Smithsonian Institution",
+                snippet="",
+                date=row.get("content", {}).get("indexedStructured", {}).get("date", [""])[0],
+                rid=row.get("id", ""),
+            )
+        )
     return results
 
 
 def search_wikipedia(query: str, limit: int = 3) -> list[dict]:
     """Wikipedia REST API — quick entity lookups. General reference only; not for academic citation."""
     import urllib.parse as _up
+
     encoded = _up.quote(query, safe="")
     data = _get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded}")
     if data and data.get("type") not in ("disambiguation", "no-extract", None):
-        return [_result(
-            title=data.get("title", ""),
-            url=(data.get("content_urls") or {}).get("desktop", {}).get("page", ""),
-            source="wikipedia",
-            institution="Wikimedia Foundation",
-            snippet=data.get("extract", "")[:400],
-            rid=data.get("pageid", ""),
-        )]
+        return [
+            _result(
+                title=data.get("title", ""),
+                url=(data.get("content_urls") or {}).get("desktop", {}).get("page", ""),
+                source="wikipedia",
+                institution="Wikimedia Foundation",
+                snippet=data.get("extract", "")[:400],
+                rid=data.get("pageid", ""),
+            )
+        ]
     # Fallback: search API
     search_data = _get(
         f"https://en.wikipedia.org/w/api.php?action=query&list=search"
@@ -1179,31 +1278,33 @@ def search_wikipedia(query: str, limit: int = 3) -> list[dict]:
     results = []
     for item in items[:limit]:
         title = item.get("title", "")
-        snippet = item.get("snippet", "").replace("<span class=\"searchmatch\">", "").replace("</span>", "")
+        snippet = (
+            item.get("snippet", "").replace('<span class="searchmatch">', "").replace("</span>", "")
+        )
         enc_title = _up.quote(title, safe="")
-        results.append(_result(
-            title=title,
-            url=f"https://en.wikipedia.org/wiki/{enc_title}",
-            source="wikipedia",
-            institution="Wikimedia Foundation",
-            snippet=snippet,
-            rid=str(item.get("pageid", "")),
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://en.wikipedia.org/wiki/{enc_title}",
+                source="wikipedia",
+                institution="Wikimedia Foundation",
+                snippet=snippet,
+                rid=str(item.get("pageid", "")),
+            )
+        )
     return results
 
 
 def search_sep(query: str, limit: int = 5) -> list[dict]:
     """Stanford Encyclopedia of Philosophy — peer-reviewed philosophical entries. No key required."""
-    url = (
-        "https://plato.stanford.edu/search/searcher.py?query="
-        + urllib.parse.quote(query)
-    )
+    url = "https://plato.stanford.edu/search/searcher.py?query=" + urllib.parse.quote(query)
     # Bypassed `_get_html` only to set the User-Agent it already sets.
     html = _get_html(url)
     if not html:
         return []
     results = []
     import re as _re
+
     seen: set[str] = set()
     # SEP search HTML (2024+): entry=/entries/slug/ in redirect URLs, title often in <b>.
     for m in _re.finditer(
@@ -1217,15 +1318,17 @@ def search_sep(query: str, limit: int = 5) -> list[dict]:
         if slug in seen:
             continue
         seen.add(slug)
-        results.append(_result(
-            title=title,
-            url=f"https://plato.stanford.edu{path}",
-            source="sep",
-            institution="Stanford Encyclopedia of Philosophy",
-            snippet="",
-            date="",
-            rid=slug,
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://plato.stanford.edu{path}",
+                source="sep",
+                institution="Stanford Encyclopedia of Philosophy",
+                snippet="",
+                date="",
+                rid=slug,
+            )
+        )
         if len(results) >= limit:
             break
     return results
@@ -1233,11 +1336,7 @@ def search_sep(query: str, limit: int = 5) -> list[dict]:
 
 def search_gutenberg(query: str, limit: int = 5) -> list[dict]:
     """Project Gutenberg — public domain books via Gutendex API. No key required."""
-    url = (
-        "https://gutendex.com/books/?search="
-        + urllib.parse.quote(query)
-        + f"&page_size={limit}"
-    )
+    url = "https://gutendex.com/books/?search=" + urllib.parse.quote(query) + f"&page_size={limit}"
     data = _get(url)
     if not data:
         return []
@@ -1247,15 +1346,17 @@ def search_gutenberg(query: str, limit: int = 5) -> list[dict]:
         authors = ", ".join(a.get("name", "") for a in (book.get("authors") or []))
         bid = book.get("id", "")
         subjects = "; ".join((book.get("subjects") or [])[:3])
-        results.append(_result(
-            title=title,
-            url=f"https://www.gutenberg.org/ebooks/{bid}" if bid else "",
-            source="gutenberg",
-            institution="Project Gutenberg",
-            snippet=f"{authors} — {subjects}".strip(" —") if (authors or subjects) else "",
-            date=str(book.get("copyright") or ""),
-            rid=str(bid),
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://www.gutenberg.org/ebooks/{bid}" if bid else "",
+                source="gutenberg",
+                institution="Project Gutenberg",
+                snippet=f"{authors} — {subjects}".strip(" —") if (authors or subjects) else "",
+                date=str(book.get("copyright") or ""),
+                rid=str(bid),
+            )
+        )
     return results
 
 
@@ -1276,15 +1377,17 @@ def search_bhl(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in (data.get("Result") or [])[:limit]:
         bid = item.get("BibliographyID") or item.get("TitleID", "")
-        results.append(_result(
-            title=item.get("FullTitle") or item.get("Title", ""),
-            url=f"https://www.biodiversitylibrary.org/bibliography/{bid}" if bid else "",
-            source="bhl",
-            institution="Biodiversity Heritage Library",
-            snippet=(item.get("Note") or "")[:200],
-            date=str(item.get("PublicationDate") or item.get("Date", "")),
-            rid=str(bid),
-        ))
+        results.append(
+            _result(
+                title=item.get("FullTitle") or item.get("Title", ""),
+                url=f"https://www.biodiversitylibrary.org/bibliography/{bid}" if bid else "",
+                source="bhl",
+                institution="Biodiversity Heritage Library",
+                snippet=(item.get("Note") or "")[:200],
+                date=str(item.get("PublicationDate") or item.get("Date", "")),
+                rid=str(bid),
+            )
+        )
     return results
 
 
@@ -1305,15 +1408,17 @@ def search_courtlistener(query: str, limit: int = 5) -> list[dict]:
         date = (item.get("dateFiled") or "")[:10]
         abs_url = item.get("absolute_url", "")
         snippet = (item.get("snippet") or "")[:200]
-        results.append(_result(
-            title=case_name,
-            url=f"https://www.courtlistener.com{abs_url}" if abs_url else "",
-            source="courtlistener",
-            institution="CourtListener",
-            snippet=f"{court} — {snippet}".strip(" —") if (court or snippet) else "",
-            date=date,
-            rid=str(item.get("id", "")),
-        ))
+        results.append(
+            _result(
+                title=case_name,
+                url=f"https://www.courtlistener.com{abs_url}" if abs_url else "",
+                source="courtlistener",
+                institution="CourtListener",
+                snippet=f"{court} — {snippet}".strip(" —") if (court or snippet) else "",
+                date=date,
+                rid=str(item.get("id", "")),
+            )
+        )
     return results
 
 
@@ -1321,9 +1426,7 @@ def search_base(query: str, limit: int = 5) -> list[dict]:
     """BASE (Bielefeld Academic Search Engine) — 350M+ open access documents. No key required."""
     url = (
         "https://api.base-search.net/cgi-bin/BaseHttpSearchInterface.fcgi"
-        "?func=PerformSearch&query="
-        + urllib.parse.quote(query)
-        + f"&hits={limit}&format=json"
+        "?func=PerformSearch&query=" + urllib.parse.quote(query) + f"&hits={limit}&format=json"
     )
     data = _get(url)
     if not data:
@@ -1343,15 +1446,19 @@ def search_base(query: str, limit: int = 5) -> list[dict]:
         desc = item.get("dcdescription", "") or ""
         if isinstance(desc, list):
             desc = desc[0] if desc else ""
-        results.append(_result(
-            title=title,
-            url=link,
-            source="base",
-            institution="BASE / Bielefeld University",
-            snippet=f"{creator} — {str(desc)[:150]}".strip(" —") if (creator or desc) else "",
-            date=date,
-            rid=item.get("dcidentifier", [""])[0] if isinstance(item.get("dcidentifier"), list) else item.get("dcidentifier", ""),
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=link,
+                source="base",
+                institution="BASE / Bielefeld University",
+                snippet=f"{creator} — {str(desc)[:150]}".strip(" —") if (creator or desc) else "",
+                date=date,
+                rid=item.get("dcidentifier", [""])[0]
+                if isinstance(item.get("dcidentifier"), list)
+                else item.get("dcidentifier", ""),
+            )
+        )
     return results
 
 
@@ -1374,18 +1481,21 @@ def search_dblp(query: str, limit: int = 5) -> list[dict]:
         if isinstance(author_list, dict):
             author_list = [author_list]
         author_str = ", ".join(
-            (a.get("text") or a) if isinstance(a, dict) else str(a)
-            for a in author_list[:3]
+            (a.get("text") or a) if isinstance(a, dict) else str(a) for a in author_list[:3]
         )
-        results.append(_result(
-            title=info.get("title", ""),
-            url=info.get("url", ""),
-            source="dblp",
-            institution="DBLP",
-            snippet=f"{author_str} — {info.get('venue', '')}".strip(" —") if (author_str or info.get("venue")) else "",
-            date=str(info.get("year", "")),
-            rid=item.get("@id", ""),
-        ))
+        results.append(
+            _result(
+                title=info.get("title", ""),
+                url=info.get("url", ""),
+                source="dblp",
+                institution="DBLP",
+                snippet=f"{author_str} — {info.get('venue', '')}".strip(" —")
+                if (author_str or info.get("venue"))
+                else "",
+                date=str(info.get("year", "")),
+                rid=item.get("@id", ""),
+            )
+        )
     return results
 
 
@@ -1408,25 +1518,25 @@ def search_openfda(query: str, limit: int = 5) -> list[dict]:
         manuf = (openfda.get("manufacturer_name") or [""])[0]
         indications = (item.get("indications_and_usage") or [""])[0][:200]
         app_num = (openfda.get("application_number") or [""])[0]
-        results.append(_result(
-            title=title,
-            url=f"https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=overview.process&ApplNo={app_num.replace('NDA', '').replace('ANDA', '').strip()}" if app_num else "",
-            source="openfda",
-            institution="U.S. FDA",
-            snippet=f"{manuf} — {indications}".strip(" —") if (manuf or indications) else "",
-            date="",
-            rid=app_num,
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=overview.process&ApplNo={app_num.replace('NDA', '').replace('ANDA', '').strip()}"
+                if app_num
+                else "",
+                source="openfda",
+                institution="U.S. FDA",
+                snippet=f"{manuf} — {indications}".strip(" —") if (manuf or indications) else "",
+                date="",
+                rid=app_num,
+            )
+        )
     return results
 
 
 def search_eol(query: str, limit: int = 5) -> list[dict]:
     """Encyclopedia of Life — species taxonomy and ecology. No key required."""
-    url = (
-        "https://eol.org/api/search/1.0.json?q="
-        + urllib.parse.quote(query)
-        + "&page=1"
-    )
+    url = "https://eol.org/api/search/1.0.json?q=" + urllib.parse.quote(query) + "&page=1"
     data = _get(url)
     if not data:
         return []
@@ -1435,24 +1545,24 @@ def search_eol(query: str, limit: int = 5) -> list[dict]:
         eid = item.get("id", "")
         title = item.get("title", "")
         content = item.get("content", "")
-        results.append(_result(
-            title=title,
-            url=f"https://eol.org/pages/{eid}" if eid else "",
-            source="eol",
-            institution="Encyclopedia of Life",
-            snippet=content[:200] if content else "",
-            date="",
-            rid=str(eid),
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://eol.org/pages/{eid}" if eid else "",
+                source="eol",
+                institution="Encyclopedia of Life",
+                snippet=content[:200] if content else "",
+                date="",
+                rid=str(eid),
+            )
+        )
     return results
 
 
 def search_gbif(query: str, limit: int = 5) -> list[dict]:
     """GBIF (Global Biodiversity Information Facility) — occurrence records. No key required."""
     url = (
-        "https://api.gbif.org/v1/species/search?q="
-        + urllib.parse.quote(query)
-        + f"&limit={limit}"
+        "https://api.gbif.org/v1/species/search?q=" + urllib.parse.quote(query) + f"&limit={limit}"
     )
     data = _get(url)
     if not data:
@@ -1465,15 +1575,17 @@ def search_gbif(query: str, limit: int = 5) -> list[dict]:
         rank = item.get("rank", "")
         kingdom = item.get("kingdom", "")
         snippet = f"{rank} — Kingdom: {kingdom}".strip(" —") if (rank or kingdom) else ""
-        results.append(_result(
-            title=sci_name or canonical,
-            url=f"https://www.gbif.org/species/{key}" if key else "",
-            source="gbif",
-            institution="GBIF",
-            snippet=snippet,
-            date="",
-            rid=str(key),
-        ))
+        results.append(
+            _result(
+                title=sci_name or canonical,
+                url=f"https://www.gbif.org/species/{key}" if key else "",
+                source="gbif",
+                institution="GBIF",
+                snippet=snippet,
+                date="",
+                rid=str(key),
+            )
+        )
     return results
 
 
@@ -1493,15 +1605,17 @@ def search_nominatim(query: str, limit: int = 5) -> list[dict]:
         country = addr.get("country", "")
         place_type = item.get("type", "") or item.get("class", "")
         snippet = f"{place_type} — {country}".strip(" —") if (place_type or country) else ""
-        results.append(_result(
-            title=item.get("display_name", ""),
-            url=f"https://www.openstreetmap.org/{osm_type}/{osm_id}" if osm_id else "",
-            source="nominatim",
-            institution="OpenStreetMap",
-            snippet=snippet,
-            date="",
-            rid=str(osm_id),
-        ))
+        results.append(
+            _result(
+                title=item.get("display_name", ""),
+                url=f"https://www.openstreetmap.org/{osm_type}/{osm_id}" if osm_id else "",
+                source="nominatim",
+                institution="OpenStreetMap",
+                snippet=snippet,
+                date="",
+                rid=str(osm_id),
+            )
+        )
     return results
 
 
@@ -1516,11 +1630,7 @@ def search_openaire(query: str, limit: int = 5) -> list[dict]:
     if not data:
         return []
     try:
-        results_raw = (
-            data.get("response", {})
-                .get("results", {})
-                .get("result") or []
-        )
+        results_raw = data.get("response", {}).get("results", {}).get("result") or []
     except Exception:
         return []
     results = []
@@ -1529,21 +1639,33 @@ def search_openaire(query: str, limit: int = 5) -> list[dict]:
         if not metadata:
             continue
         title_obj = metadata.get("title") or {}
-        title = title_obj.get("$") if isinstance(title_obj, dict) else (title_obj[0].get("$") if isinstance(title_obj, list) and title_obj else "")
+        title = (
+            title_obj.get("$")
+            if isinstance(title_obj, dict)
+            else (title_obj[0].get("$") if isinstance(title_obj, list) and title_obj else "")
+        )
         pid_list = metadata.get("pid") or []
         if isinstance(pid_list, dict):
             pid_list = [pid_list]
-        doi = next((p.get("$") for p in pid_list if isinstance(p, dict) and p.get("@classid") == "doi"), "")
-        date = (metadata.get("dateofacceptance") or {}).get("$", "")[:10] if isinstance(metadata.get("dateofacceptance"), dict) else ""
-        results.append(_result(
-            title=title or "",
-            url=f"https://doi.org/{doi}" if doi else "",
-            source="openaire",
-            institution="OpenAIRE",
-            snippet="",
-            date=date,
-            rid=doi,
-        ))
+        doi = next(
+            (p.get("$") for p in pid_list if isinstance(p, dict) and p.get("@classid") == "doi"), ""
+        )
+        date = (
+            (metadata.get("dateofacceptance") or {}).get("$", "")[:10]
+            if isinstance(metadata.get("dateofacceptance"), dict)
+            else ""
+        )
+        results.append(
+            _result(
+                title=title or "",
+                url=f"https://doi.org/{doi}" if doi else "",
+                source="openaire",
+                institution="OpenAIRE",
+                snippet="",
+                date=date,
+                rid=doi,
+            )
+        )
     return results
 
 
@@ -1566,15 +1688,17 @@ def search_inaturalist(query: str, limit: int = 5) -> list[dict]:
         obs_count = item.get("observations_count", 0)
         title = f"{preferred} ({name})" if preferred else name
         snippet = f"{rank.capitalize()} — {obs_count:,} observations" if rank else ""
-        results.append(_result(
-            title=title,
-            url=f"https://www.inaturalist.org/taxa/{taxon_id}" if taxon_id else "",
-            source="inaturalist",
-            institution="iNaturalist",
-            snippet=snippet,
-            date="",
-            rid=str(taxon_id),
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://www.inaturalist.org/taxa/{taxon_id}" if taxon_id else "",
+                source="inaturalist",
+                institution="iNaturalist",
+                snippet=snippet,
+                date="",
+                rid=str(taxon_id),
+            )
+        )
     return results
 
 
@@ -1582,8 +1706,7 @@ def search_federal_register(query: str, limit: int = 5) -> list[dict]:
     """Federal Register (US) — federal rulemaking, executive orders, notices. No key required."""
     url = (
         "https://www.federalregister.gov/api/v1/documents.json"
-        "?conditions%5Bterm%5D=" + urllib.parse.quote(query)
-        + f"&per_page={limit}&order=relevance"
+        "?conditions%5Bterm%5D=" + urllib.parse.quote(query) + f"&per_page={limit}&order=relevance"
         "&fields%5B%5D=title&fields%5B%5D=document_number&fields%5B%5D=type"
         "&fields%5B%5D=publication_date&fields%5B%5D=abstract"
         "&fields%5B%5D=html_url&fields%5B%5D=agency_names"
@@ -1596,15 +1719,17 @@ def search_federal_register(query: str, limit: int = 5) -> list[dict]:
         agencies = ", ".join((item.get("agency_names") or [])[:2])
         doc_type = item.get("type", "")
         snippet = f"{doc_type} — {agencies} — {(item.get('abstract') or '')[:150]}".strip(" —")
-        results.append(_result(
-            title=item.get("title", ""),
-            url=item.get("html_url", ""),
-            source="federal_register",
-            institution="U.S. Federal Register",
-            snippet=snippet,
-            date=(item.get("publication_date") or "")[:10],
-            rid=item.get("document_number", ""),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=item.get("html_url", ""),
+                source="federal_register",
+                institution="U.S. Federal Register",
+                snippet=snippet,
+                date=(item.get("publication_date") or "")[:10],
+                rid=item.get("document_number", ""),
+            )
+        )
     return results
 
 
@@ -1620,24 +1745,24 @@ def search_datagov(query: str, limit: int = 5) -> list[dict]:
     for item in ((data.get("result") or {}).get("results") or [])[:limit]:
         org = (item.get("organization") or {}).get("title", "")
         notes = (item.get("notes") or "")[:200]
-        results.append(_result(
-            title=item.get("title", ""),
-            url=f"https://catalog.data.gov/dataset/{item.get('name', '')}",
-            source="datagov",
-            institution="data.gov (U.S. Government)",
-            snippet=f"{org} — {notes}".strip(" —") if (org or notes) else "",
-            date=(item.get("metadata_modified") or "")[:10],
-            rid=item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=f"https://catalog.data.gov/dataset/{item.get('name', '')}",
+                source="datagov",
+                institution="data.gov (U.S. Government)",
+                snippet=f"{org} — {notes}".strip(" —") if (org or notes) else "",
+                date=(item.get("metadata_modified") or "")[:10],
+                rid=item.get("id", ""),
+            )
+        )
     return results
 
 
 def search_uk_legislation(query: str, limit: int = 5) -> list[dict]:
     """legislation.gov.uk — UK Acts of Parliament, statutory instruments. No key required."""
     url = (
-        "https://www.legislation.gov.uk/search?title="
-        + urllib.parse.quote(query)
-        + "&format=json"
+        "https://www.legislation.gov.uk/search?title=" + urllib.parse.quote(query) + "&format=json"
     )
     data = _get(url, {"Accept": "application/json"})
     if not data:
@@ -1650,15 +1775,19 @@ def search_uk_legislation(query: str, limit: int = 5) -> list[dict]:
         year = str(item.get("year", ""))
         title = item.get("title", "")
         href = item.get("href", "")
-        results.append(_result(
-            title=title,
-            url=f"https://www.legislation.gov.uk{href}" if href and not href.startswith("http") else href,
-            source="uk_legislation",
-            institution="legislation.gov.uk",
-            snippet=f"{leg_type} {year}".strip(),
-            date=year,
-            rid=href,
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://www.legislation.gov.uk{href}"
+                if href and not href.startswith("http")
+                else href,
+                source="uk_legislation",
+                institution="legislation.gov.uk",
+                snippet=f"{leg_type} {year}".strip(),
+                date=year,
+                rid=href,
+            )
+        )
     return results
 
 
@@ -1675,18 +1804,22 @@ def search_eu_data(query: str, limit: int = 5) -> list[dict]:
     results = []
     for item in (data.get("result", {}).get("results", []) or [])[:limit]:
         pub = (item.get("publisher") or {}).get("name", "")
-        desc = (item.get("description") or {})
+        desc = item.get("description") or {}
         if isinstance(desc, dict):
             desc = desc.get("en", "") or next(iter(desc.values()), "")
-        results.append(_result(
-            title=(item.get("title") or {}).get("en", "") or item.get("title", "") if isinstance(item.get("title"), dict) else item.get("title", ""),
-            url=item.get("landingPage", ""),
-            source="eu_data",
-            institution="data.europa.eu (EU)",
-            snippet=f"{pub} — {str(desc)[:150]}".strip(" —") if (pub or desc) else "",
-            date=(item.get("modified") or "")[:10],
-            rid=item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=(item.get("title") or {}).get("en", "") or item.get("title", "")
+                if isinstance(item.get("title"), dict)
+                else item.get("title", ""),
+                url=item.get("landingPage", ""),
+                source="eu_data",
+                institution="data.europa.eu (EU)",
+                snippet=f"{pub} — {str(desc)[:150]}".strip(" —") if (pub or desc) else "",
+                date=(item.get("modified") or "")[:10],
+                rid=item.get("id", ""),
+            )
+        )
     return results
 
 
@@ -1694,17 +1827,24 @@ def search_musicbrainz(query: str, limit: int = 5) -> list[dict]:
     """MusicBrainz — open music encyclopedia. Artists, recordings, albums. No key required.
     Searches release-groups (albums/singles) first; falls back to recordings for track queries."""
     q_lower = query.lower()
-    use_releases = any(w in q_lower for w in ["album", "release", "discography", "ep", "lp", "record"])
+    use_releases = any(
+        w in q_lower for w in ["album", "release", "discography", "ep", "lp", "record"]
+    )
 
     if use_releases:
         # Strip the type word to get artist name, then use Lucene artist: syntax
         artist_name = re.sub(
-            r"\b(albums?|discography|ep|lp|records?|singles?|releases?)\b", "", query, flags=re.IGNORECASE
+            r"\b(albums?|discography|ep|lp|records?|singles?|releases?)\b",
+            "",
+            query,
+            flags=re.IGNORECASE,
         ).strip()
         # Filter to Albums only when query is album/discography context
-        type_filter = " AND primarytype:Album" if any(
-            w in q_lower for w in ["album", "discography", "lp"]
-        ) else ""
+        type_filter = (
+            " AND primarytype:Album"
+            if any(w in q_lower for w in ["album", "discography", "lp"])
+            else ""
+        )
         mb_query = f'artist:"{artist_name}"{type_filter}' if artist_name else query
         url = (
             "https://musicbrainz.org/ws/2/release-group?query="
@@ -1722,15 +1862,17 @@ def search_musicbrainz(query: str, limit: int = 5) -> list[dict]:
             )
             mbid = item.get("id", "")
             rtype = item.get("primary-type", "")
-            results.append(_result(
-                title=item.get("title", ""),
-                url=f"https://musicbrainz.org/release-group/{mbid}" if mbid else "",
-                source="musicbrainz",
-                institution="MusicBrainz",
-                snippet=f"{artist} — {rtype}".strip(" —") if (artist or rtype) else "",
-                date=(item.get("first-release-date") or "")[:10],
-                rid=mbid,
-            ))
+            results.append(
+                _result(
+                    title=item.get("title", ""),
+                    url=f"https://musicbrainz.org/release-group/{mbid}" if mbid else "",
+                    source="musicbrainz",
+                    institution="MusicBrainz",
+                    snippet=f"{artist} — {rtype}".strip(" —") if (artist or rtype) else "",
+                    date=(item.get("first-release-date") or "")[:10],
+                    rid=mbid,
+                )
+            )
         if results:
             return results
 
@@ -1752,17 +1894,21 @@ def search_musicbrainz(query: str, limit: int = 5) -> list[dict]:
         )
         releases = item.get("releases") or []
         release_title = releases[0].get("title", "") if releases else ""
-        date = (releases[0].get("date", "") if releases else "") or item.get("first-release-date", "")
+        date = (releases[0].get("date", "") if releases else "") or item.get(
+            "first-release-date", ""
+        )
         mbid = item.get("id", "")
-        results.append(_result(
-            title=item.get("title", ""),
-            url=f"https://musicbrainz.org/recording/{mbid}" if mbid else "",
-            source="musicbrainz",
-            institution="MusicBrainz",
-            snippet=f"{artist} — {release_title}".strip(" —"),
-            date=date[:10] if date else "",
-            rid=mbid,
-        ))
+        results.append(
+            _result(
+                title=item.get("title", ""),
+                url=f"https://musicbrainz.org/recording/{mbid}" if mbid else "",
+                source="musicbrainz",
+                institution="MusicBrainz",
+                snippet=f"{artist} — {release_title}".strip(" —"),
+                date=date[:10] if date else "",
+                rid=mbid,
+            )
+        )
     return results
 
 
@@ -1775,7 +1921,8 @@ def search_europeana(query: str, limit: int = 5) -> list[dict]:
     url = (
         "https://api.europeana.eu/record/v2/search.json?wskey="
         + key
-        + "&query=" + urllib.parse.quote(query)
+        + "&query="
+        + urllib.parse.quote(query)
         + f"&rows={limit}&profile=rich"
     )
     data = _get(url)
@@ -1783,15 +1930,17 @@ def search_europeana(query: str, limit: int = 5) -> list[dict]:
         return []
     results = []
     for item in (data.get("items") or [])[:limit]:
-        results.append(_result(
-            title=(item.get("title") or [""])[0],
-            url=item.get("guid", ""),
-            source="europeana",
-            institution=(item.get("dataProvider") or ["Europeana"])[0],
-            snippet=(item.get("dcDescription") or [""])[0],
-            date=(item.get("year") or [""])[0],
-            rid=item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=(item.get("title") or [""])[0],
+                url=item.get("guid", ""),
+                source="europeana",
+                institution=(item.get("dataProvider") or ["Europeana"])[0],
+                snippet=(item.get("dcDescription") or [""])[0],
+                date=(item.get("year") or [""])[0],
+                rid=item.get("id", ""),
+            )
+        )
     return results
 
 
@@ -1799,11 +1948,8 @@ def search_psychiatric_times(query: str, limit: int = 5) -> list[dict]:
     """Psychiatric Times — clinical psychiatry news, case reports, and review articles.
     HTML scraper (no API key). Press tier — trade press, not peer-reviewed."""
     import re as _re
-    url = (
-        "https://www.psychiatrictimes.com/search#q="
-        + urllib.parse.quote(query)
-        + "&t=All"
-    )
+
+    url = "https://www.psychiatrictimes.com/search#q=" + urllib.parse.quote(query) + "&t=All"
     html = _get_html(url)
     if not html:
         return []
@@ -1815,33 +1961,36 @@ def search_psychiatric_times(query: str, limit: int = 5) -> list[dict]:
         _re.S,
     )
     date_re = _re.compile(
-        r'\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4})\b'
+        r"\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4})\b"
     )
     seen: set[str] = set()
     for m in link_re.finditer(html):
         path = m.group(1)
-        title = _re.sub(r'\s+', ' ', m.group(2)).strip()
+        title = _re.sub(r"\s+", " ", m.group(2)).strip()
         if path in seen or not title:
             continue
         seen.add(path)
-        nearby = html[max(0, m.start() - 200): m.start() + 400]
+        nearby = html[max(0, m.start() - 200) : m.start() + 400]
         date_m = date_re.search(nearby)
         date = date_m.group(1) if date_m else ""
-        results.append(_result(
-            title=title,
-            url=f"https://www.psychiatrictimes.com{path}",
-            source="psychiatric_times",
-            institution="Psychiatric Times",
-            snippet="",
-            date=date,
-            rid=path,
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://www.psychiatrictimes.com{path}",
+                source="psychiatric_times",
+                institution="Psychiatric Times",
+                snippet="",
+                date=date,
+                rid=path,
+            )
+        )
         if len(results) >= limit:
             break
     return results
 
 
 # ── HIGH-ENERGY PHYSICS ───────────────────────────────────────────────────────
+
 
 def search_inspirehep(query: str, limit: int = 5) -> list[dict]:
     """InspireHEP — CERN/SLAC high-energy physics literature. No key required."""
@@ -1864,20 +2013,25 @@ def search_inspirehep(query: str, limit: int = 5) -> list[dict]:
         arxiv = ((meta.get("arxiv_eprints") or [{}])[0]).get("value", "")
         pub = (meta.get("publication_info") or [{}])[0]
         year = str(pub.get("year", ""))
-        link = f"https://doi.org/{doi}" if doi else (f"https://arxiv.org/abs/{arxiv}" if arxiv else "")
-        results.append(_result(
-            title=title,
-            url=link,
-            source="inspirehep",
-            institution="INSPIRE-HEP (CERN)",
-            snippet=abstract,
-            date=year,
-            rid=doi or arxiv,
-        ))
+        link = (
+            f"https://doi.org/{doi}" if doi else (f"https://arxiv.org/abs/{arxiv}" if arxiv else "")
+        )
+        results.append(
+            _result(
+                title=title,
+                url=link,
+                source="inspirehep",
+                institution="INSPIRE-HEP (CERN)",
+                snippet=abstract,
+                date=year,
+                rid=doi or arxiv,
+            )
+        )
     return results
 
 
 # ── ECONOMICS ─────────────────────────────────────────────────────────────────
+
 
 def search_worldbank(query: str, limit: int = 5) -> list[dict]:
     """World Bank Open Data — global development indicators (WDI). No key required.
@@ -1890,9 +2044,10 @@ def search_worldbank(query: str, limit: int = 5) -> list[dict]:
         return []
     indicators = data[1] or []
     q_terms = [t for t in query.lower().split() if len(t) > 2]
+
     def _words(s: str) -> set:
-        return set("".join(c if c.isalnum() else " "
-                           for c in (s or "").lower()).split())
+        return set("".join(c if c.isalnum() else " " for c in (s or "").lower()).split())
+
     if q_terms:
         # Whole-word match (so "product" does not hit "production"), ranked by
         # relevance — alphabetical order otherwise buries the real match under AG.*.
@@ -1913,19 +2068,24 @@ def search_worldbank(query: str, limit: int = 5) -> list[dict]:
         name = item.get("name", "")
         source = (item.get("sourceNote") or "")[:300]
         topic = ", ".join(t.get("value", "") for t in (item.get("topics") or []) if t.get("value"))
-        results.append(_result(
-            title=name,
-            url=f"https://data.worldbank.org/indicator/{iid}" if iid else "https://data.worldbank.org",
-            source="worldbank",
-            institution="World Bank Open Data",
-            snippet=source or topic,
-            date="",
-            rid=iid,
-        ))
+        results.append(
+            _result(
+                title=name,
+                url=f"https://data.worldbank.org/indicator/{iid}"
+                if iid
+                else "https://data.worldbank.org",
+                source="worldbank",
+                institution="World Bank Open Data",
+                snippet=source or topic,
+                date="",
+                rid=iid,
+            )
+        )
     return results
 
 
 # ── FOOD & NUTRITION ──────────────────────────────────────────────────────────
+
 
 def search_openfoodfacts(query: str, limit: int = 5) -> list[dict]:
     """Open Food Facts — global food product & nutrient database. No key required."""
@@ -1950,19 +2110,27 @@ def search_openfoodfacts(query: str, limit: int = 5) -> list[dict]:
         kcal = nut.get("energy-kcal_100g", "")
         snippet_parts = [x for x in [brand, categories, (f"{kcal} kcal/100g" if kcal else "")] if x]
         pid = p.get("_id") or p.get("id", "")
-        results.append(_result(
-            title=f"{name}{' (' + quantity + ')' if quantity else ''}",
-            url=p.get("url") or (f"https://world.openfoodfacts.org/product/{pid}" if pid else "https://world.openfoodfacts.org"),
-            source="openfoodfacts",
-            institution="Open Food Facts",
-            snippet=", ".join(snippet_parts),
-            date="",
-            rid=pid,
-        ))
+        results.append(
+            _result(
+                title=f"{name}{' (' + quantity + ')' if quantity else ''}",
+                url=p.get("url")
+                or (
+                    f"https://world.openfoodfacts.org/product/{pid}"
+                    if pid
+                    else "https://world.openfoodfacts.org"
+                ),
+                source="openfoodfacts",
+                institution="Open Food Facts",
+                snippet=", ".join(snippet_parts),
+                date="",
+                rid=pid,
+            )
+        )
     return results
 
 
 # ── ENVIRONMENT ───────────────────────────────────────────────────────────────
+
 
 def search_carbon_intensity(query: str, limit: int = 5) -> list[dict]:
     """UK Carbon Intensity API — official National Grid ESO data. No key required.
@@ -1971,44 +2139,47 @@ def search_carbon_intensity(query: str, limit: int = 5) -> list[dict]:
     generation_data = _get("https://api.carbonintensity.org.uk/generation")
     results = []
     if intensity_data:
-        entry = ((intensity_data.get("data") or [{}])[0])
+        entry = (intensity_data.get("data") or [{}])[0]
         intensity = entry.get("intensity") or {}
-        actual   = intensity.get("actual")
+        actual = intensity.get("actual")
         forecast = intensity.get("forecast")
-        index    = intensity.get("index", "")
-        from_ts  = entry.get("from", "")[:10]
+        index = intensity.get("index", "")
+        from_ts = entry.get("from", "")[:10]
         snippet = (
             f"Actual: {actual} gCO₂/kWh · Forecast: {forecast} gCO₂/kWh · Index: {index}"
         ).strip(" ·")
-        results.append(_result(
-            title="UK Grid Carbon Intensity — current",
-            url="https://carbonintensity.org.uk",
-            source="carbon_intensity",
-            institution="National Grid ESO (UK Government)",
-            snippet=snippet,
-            date=from_ts,
-            rid="intensity-current",
-        ))
+        results.append(
+            _result(
+                title="UK Grid Carbon Intensity — current",
+                url="https://carbonintensity.org.uk",
+                source="carbon_intensity",
+                institution="National Grid ESO (UK Government)",
+                snippet=snippet,
+                date=from_ts,
+                rid="intensity-current",
+            )
+        )
     if generation_data:
         gen_entry = generation_data.get("data") or {}
         gen_mix = gen_entry.get("generationmix") or []
-        fuels = ", ".join(
-            f"{g['fuel']} {g['perc']:.1f}%" for g in gen_mix if g.get("perc", 0) > 1
-        )
+        fuels = ", ".join(f"{g['fuel']} {g['perc']:.1f}%" for g in gen_mix if g.get("perc", 0) > 1)
         from_ts = gen_entry.get("from", "")[:10]
-        results.append(_result(
-            title="UK Grid Generation Mix — current",
-            url="https://carbonintensity.org.uk",
-            source="carbon_intensity",
-            institution="National Grid ESO (UK Government)",
-            snippet=fuels,
-            date=from_ts,
-            rid="generation-current",
-        ))
+        results.append(
+            _result(
+                title="UK Grid Generation Mix — current",
+                url="https://carbonintensity.org.uk",
+                source="carbon_intensity",
+                institution="National Grid ESO (UK Government)",
+                snippet=fuels,
+                date=from_ts,
+                rid="generation-current",
+            )
+        )
     return results[:limit]
 
 
 # ── WEATHER ───────────────────────────────────────────────────────────────────
+
 
 def search_nws(query: str, limit: int = 5) -> list[dict]:
     """US National Weather Service — active alerts and official forecasts. No key required."""
@@ -2022,9 +2193,9 @@ def search_nws(query: str, limit: int = 5) -> list[dict]:
     scored = []
     for f in features:
         props = f.get("properties") or {}
-        event    = props.get("event", "") or ""
+        event = props.get("event", "") or ""
         headline = props.get("headline", "") or ""
-        area     = props.get("areaDesc", "") or ""
+        area = props.get("areaDesc", "") or ""
         combined = f"{event} {headline} {area}".lower()
         score = sum(1 for w in query_words if w in combined)
         scored.append((score, f))
@@ -2032,25 +2203,28 @@ def search_nws(query: str, limit: int = 5) -> list[dict]:
     results = []
     for _, f in scored[:limit]:
         props = f.get("properties") or {}
-        event    = props.get("event", "")
+        event = props.get("event", "")
         headline = props.get("headline", "")
-        area     = props.get("areaDesc", "")
+        area = props.get("areaDesc", "")
         effective = (props.get("effective") or "")[:10]
-        fid  = props.get("id", "")
+        fid = props.get("id", "")
         url_link = "https://www.weather.gov"
-        results.append(_result(
-            title=f"{event} — {area}" if area else event,
-            url=url_link,
-            source="nws",
-            institution="U.S. National Weather Service (NOAA)",
-            snippet=headline,
-            date=effective,
-            rid=fid,
-        ))
+        results.append(
+            _result(
+                title=f"{event} — {area}" if area else event,
+                url=url_link,
+                source="nws",
+                institution="U.S. National Weather Service (NOAA)",
+                snippet=headline,
+                date=effective,
+                rid=fid,
+            )
+        )
     return results
 
 
 # ── NEWS ──────────────────────────────────────────────────────────────────────
+
 
 def search_gdelt(query: str, limit: int = 5) -> list[dict]:
     """GDELT — global news event stream, 100+ languages indexed. No key required."""
@@ -2070,19 +2244,22 @@ def search_gdelt(query: str, limit: int = 5) -> list[dict]:
         domain = a.get("domain", "")
         raw_date = (a.get("seendate") or "")[:8]
         date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}" if len(raw_date) == 8 else ""
-        results.append(_result(
-            title=title or domain,
-            url=url_,
-            source="gdelt",
-            institution=f"GDELT ({domain})",
-            snippet=domain,
-            date=date,
-            rid=url_,
-        ))
+        results.append(
+            _result(
+                title=title or domain,
+                url=url_,
+                source="gdelt",
+                institution=f"GDELT ({domain})",
+                snippet=domain,
+                date=date,
+                rid=url_,
+            )
+        )
     return results
 
 
 # ── PUBLIC HEALTH ──────────────────────────────────────────────────────────────
+
 
 def search_who_gho(query: str, limit: int = 5) -> list[dict]:
     """WHO Global Health Observatory — official global health statistics. No key required."""
@@ -2099,24 +2276,39 @@ def search_who_gho(query: str, limit: int = 5) -> list[dict]:
     for ind in indicators:
         code = ind.get("IndicatorCode", "")
         name = ind.get("IndicatorName", "")
-        results.append(_result(
-            title=name,
-            url=f"https://www.who.int/data/gho/data/indicators/indicator-details/GHO/{code}",
-            source="who_gho",
-            institution="World Health Organization (WHO)",
-            snippet=code,
-            date="",
-            rid=code,
-        ))
+        results.append(
+            _result(
+                title=name,
+                url=f"https://www.who.int/data/gho/data/indicators/indicator-details/GHO/{code}",
+                source="who_gho",
+                institution="World Health Organization (WHO)",
+                snippet=code,
+                date="",
+                rid=code,
+            )
+        )
     return results
 
 
 # ── CLIMATE / WEATHER (global) ─────────────────────────────────────────────────
 
+
 def search_open_meteo(query: str, limit: int = 5) -> list[dict]:
     """Open-Meteo — global weather and climate data via ECMWF. No key required.
     Geocodes the location in the query then returns current conditions + 3-day forecast."""
-    _WEATHER_STOP = {"weather","forecast","climate","temperature","rain","snow","wind","humidity","today","now","current"}
+    _WEATHER_STOP = {
+        "weather",
+        "forecast",
+        "climate",
+        "temperature",
+        "rain",
+        "snow",
+        "wind",
+        "humidity",
+        "today",
+        "now",
+        "current",
+    }
     geo_term = " ".join(w for w in query.split() if w.lower() not in _WEATHER_STOP) or query
     geo_url = (
         "https://geocoding-api.open-meteo.com/v1/search?name="
@@ -2150,38 +2342,46 @@ def search_open_meteo(query: str, limit: int = 5) -> list[dict]:
     # truncate to the shortest and hand back a short forecast that reads as a
     # complete one; ragged here means the response is malformed, and the source
     # should land in `failed` rather than quietly answer with less.
-    days = list(zip(
-        (daily.get("time") or [])[:3],
-        (daily.get("temperature_2m_max") or [])[:3],
-        (daily.get("temperature_2m_min") or [])[:3],
-        strict=True,
-    ))
+    days = list(
+        zip(
+            (daily.get("time") or [])[:3],
+            (daily.get("temperature_2m_max") or [])[:3],
+            (daily.get("temperature_2m_min") or [])[:3],
+            strict=True,
+        )
+    )
     forecast = " | ".join(f"{d}: {hi}/{lo}°C" for d, hi, lo in days)
     snippet = f"Current: {temp}°C, humidity {humid}%, wind {wind} km/h | Forecast: {forecast}"
-    return [_result(
-        title=f"{name}, {country} — weather",
-        url="https://open-meteo.com",
-        source="open_meteo",
-        institution="Open-Meteo (ECMWF data)",
-        snippet=snippet,
-        date=(current.get("time") or "")[:10],
-        rid=f"{lat},{lon}",
-    )]
+    return [
+        _result(
+            title=f"{name}, {country} — weather",
+            url="https://open-meteo.com",
+            source="open_meteo",
+            institution="Open-Meteo (ECMWF data)",
+            snippet=snippet,
+            date=(current.get("time") or "")[:10],
+            rid=f"{lat},{lon}",
+        )
+    ]
 
 
 # ── PATENTS ───────────────────────────────────────────────────────────────────
 
+
 def search_patentsview(query: str, limit: int = 5) -> list[dict]:
     """USPTO PatentsView — full US patent database. No key required."""
     import json as _json
+
     q = _json.dumps({"_text_any": {"patent_title": query, "patent_abstract": query}})
     f = _json.dumps(["patent_id", "patent_title", "patent_abstract", "patent_date"])
     o = _json.dumps({"per_page": limit, "sort": {"patent_date": "desc"}})
     url = (
         "https://search.patentsview.org/api/v1/patent?q="
         + urllib.parse.quote(q)
-        + "&f=" + urllib.parse.quote(f)
-        + "&o=" + urllib.parse.quote(o)
+        + "&f="
+        + urllib.parse.quote(f)
+        + "&o="
+        + urllib.parse.quote(o)
     )
     data = _get(url)
     if not data:
@@ -2193,19 +2393,22 @@ def search_patentsview(query: str, limit: int = 5) -> list[dict]:
         title = p.get("patent_title", "")
         abstract = (p.get("patent_abstract") or "")[:300]
         date = (p.get("patent_date") or "")[:10]
-        results.append(_result(
-            title=title,
-            url=f"https://patents.google.com/patent/US{pid}",
-            source="patentsview",
-            institution="USPTO PatentsView",
-            snippet=abstract,
-            date=date,
-            rid=pid,
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=f"https://patents.google.com/patent/US{pid}",
+                source="patentsview",
+                institution="USPTO PatentsView",
+                snippet=abstract,
+                date=date,
+                rid=pid,
+            )
+        )
     return results
 
 
 # ── MACROECONOMICS ────────────────────────────────────────────────────────────
+
 
 def search_imf(query: str, limit: int = 5) -> list[dict]:
     """IMF DataMapper — 132 global macroeconomic indicators. No key required."""
@@ -2214,28 +2417,33 @@ def search_imf(query: str, limit: int = 5) -> list[dict]:
         return []
     indicators = data.get("indicators") or {}
     q_terms = [t for t in query.lower().split() if len(t) > 2]
+
     def _matches(v: dict) -> bool:
         text = ((v.get("label") or "") + " " + (v.get("description") or "")).lower()
         return any(t in text for t in q_terms)
+
     matches = [(k, v) for k, v in indicators.items() if _matches(v)][:limit]
     results = []
     for code, meta in matches:
         label = meta.get("label", code)
         desc = (meta.get("description") or "")[:280]
         unit = meta.get("unit", "")
-        results.append(_result(
-            title=f"{label} ({unit})" if unit else label,
-            url=f"https://www.imf.org/external/datamapper/{code}",
-            source="imf",
-            institution="International Monetary Fund (IMF)",
-            snippet=desc,
-            date="",
-            rid=code,
-        ))
+        results.append(
+            _result(
+                title=f"{label} ({unit})" if unit else label,
+                url=f"https://www.imf.org/external/datamapper/{code}",
+                source="imf",
+                institution="International Monetary Fund (IMF)",
+                snippet=desc,
+                date="",
+                rid=code,
+            )
+        )
     return results
 
 
 # ── SOCIAL SCIENCE PREPRINTS ───────────────────────────────────────────────────
+
 
 def search_osf(query: str, limit: int = 5) -> list[dict]:
     """OSF Preprints — open social science, psychology, medicine preprints. No key required."""
@@ -2257,66 +2465,101 @@ def search_osf(query: str, limit: int = 5) -> list[dict]:
         doi = attrs.get("doi") or ""
         date = (attrs.get("date_published") or attrs.get("date_created") or "")[:10]
         url_ = links.get("html") or links.get("iri") or ""
-        results.append(_result(
-            title=title,
-            url=url_,
-            source="osf",
-            institution="Open Science Framework (OSF)",
-            snippet=desc or doi,
-            date=date,
-            rid=item.get("id", ""),
-        ))
+        results.append(
+            _result(
+                title=title,
+                url=url_,
+                source="osf",
+                institution="Open Science Framework (OSF)",
+                snippet=desc or doi,
+                date=date,
+                rid=item.get("id", ""),
+            )
+        )
     return results
 
 
 # ── SPORTS ───────────────────────────────────────────────────────────────────
 
+
 def search_thesportsdb(query: str, limit: int = 5) -> list[dict]:
     """TheSportsDB — teams, players, leagues, and events. No key required (demo tier)."""
     results = []
     for kind, _key, endpoint in [
-        ("teams",   "teams",   f"https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t={urllib.parse.quote(query)}"),
-        ("players", "players", f"https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p={urllib.parse.quote(query)}"),
+        (
+            "teams",
+            "teams",
+            f"https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t={urllib.parse.quote(query)}",
+        ),
+        (
+            "players",
+            "players",
+            f"https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p={urllib.parse.quote(query)}",
+        ),
     ]:
         if len(results) >= limit:
             break
         data = _get(endpoint)
         if not data or not data.get(kind):
             continue
-        for item in (data[kind] or [])[:limit - len(results)]:
+        for item in (data[kind] or [])[: limit - len(results)]:
             if kind == "teams":
                 name = item.get("strTeam", "")
                 sport = item.get("strSport", "")
                 league = item.get("strLeague", "")
                 desc = (item.get("strDescriptionEN") or "")[:280]
-                url_ = f"https://www.thesportsdb.com/team/{item.get('idTeam','')}"
+                url_ = f"https://www.thesportsdb.com/team/{item.get('idTeam', '')}"
                 snippet = f"{sport} · {league}" if sport else league
             else:
                 name = item.get("strPlayer", "")
                 sport = item.get("strSport", "")
                 nation = item.get("strNationality", "")
                 desc = (item.get("strDescriptionEN") or "")[:280]
-                url_ = f"https://www.thesportsdb.com/player/{item.get('idPlayer','')}"
+                url_ = f"https://www.thesportsdb.com/player/{item.get('idPlayer', '')}"
                 snippet = f"{sport} · {nation}" if sport else nation
-            results.append(_result(
-                title=name,
-                url=url_,
-                source="thesportsdb",
-                institution="TheSportsDB",
-                snippet=snippet + (f" — {desc[:200]}" if desc else ""),
-                date="",
-                rid=item.get("idTeam") or item.get("idPlayer", ""),
-            ))
+            results.append(
+                _result(
+                    title=name,
+                    url=url_,
+                    source="thesportsdb",
+                    institution="TheSportsDB",
+                    snippet=snippet + (f" — {desc[:200]}" if desc else ""),
+                    date="",
+                    rid=item.get("idTeam") or item.get("idPlayer", ""),
+                )
+            )
     return results[:limit]
 
 
 # ── FINANCE / FX ─────────────────────────────────────────────────────────────
 
+
 def search_frankfurter(query: str, limit: int = 5) -> list[dict]:
     """Frankfurter — ECB official exchange rates. No key required."""
     # Determine base currency from query; default EUR
     q_upper = query.upper()
-    known = {"USD","EUR","GBP","JPY","CHF","AUD","CAD","CNY","SEK","NOK","DKK","NZD","SGD","HKD","KRW","INR","BRL","MXN","ZAR","TRY"}
+    known = {
+        "USD",
+        "EUR",
+        "GBP",
+        "JPY",
+        "CHF",
+        "AUD",
+        "CAD",
+        "CNY",
+        "SEK",
+        "NOK",
+        "DKK",
+        "NZD",
+        "SGD",
+        "HKD",
+        "KRW",
+        "INR",
+        "BRL",
+        "MXN",
+        "ZAR",
+        "TRY",
+    }
     base = next((tok for tok in q_upper.split() if tok in known), "EUR")
     url = f"https://api.frankfurter.app/latest?from={base}"
     data = _get(url)
@@ -2328,15 +2571,17 @@ def search_frankfurter(query: str, limit: int = 5) -> list[dict]:
     # Score currencies by query relevance (mentioned first, otherwise alphabetical)
     scored = sorted(rates.items(), key=lambda kv: (0 if kv[0] in q_upper else 1, kv[0]))
     for currency, rate in scored[:limit]:
-        results.append(_result(
-            title=f"1 {base} = {rate} {currency}",
-            url="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/",
-            source="frankfurter",
-            institution="European Central Bank (ECB) via Frankfurter",
-            snippet=f"Base: {base} · As of {date}",
-            date=date,
-            rid=f"{base}/{currency}",
-        ))
+        results.append(
+            _result(
+                title=f"1 {base} = {rate} {currency}",
+                url="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/",
+                source="frankfurter",
+                institution="European Central Bank (ECB) via Frankfurter",
+                snippet=f"Base: {base} · As of {date}",
+                date=date,
+                rid=f"{base}/{currency}",
+            )
+        )
     return results
 
 
@@ -2366,34 +2611,51 @@ _FBI_VAULT_HOST = "vault.fbi.gov"
 
 def search_fbi_vault(query: str, limit: int = 5) -> list[dict]:
     """FBI Records Vault — declassified FBI files on persons, events, organizations."""
-    url = ("https://vault.fbi.gov/@search?SearchableText="
-           + urllib.parse.quote(query) + f"&portal_type:list=File&b_size={limit}")
+    url = (
+        "https://vault.fbi.gov/@search?SearchableText="
+        + urllib.parse.quote(query)
+        + f"&portal_type:list=File&b_size={limit}"
+    )
     data = _get(url)
     items: list = []
     if isinstance(data, dict):
         items = data.get("items") or data.get("@components", {}).get("items", [])
     elif isinstance(data, list):
         items = data
-    results = [_result(
-        title=item.get("title", ""), url=item.get("@id", ""), source="fbi_vault",
-        institution="FBI Records Vault (Declassified)",
-        snippet=(item.get("description") or "")[:200],
-        date=(item.get("effective") or "")[:10], rid=item.get("@id", ""),
-    ) for item in items[:limit]]
+    results = [
+        _result(
+            title=item.get("title", ""),
+            url=item.get("@id", ""),
+            source="fbi_vault",
+            institution="FBI Records Vault (Declassified)",
+            snippet=(item.get("description") or "")[:200],
+            date=(item.get("effective") or "")[:10],
+            rid=item.get("@id", ""),
+        )
+        for item in items[:limit]
+    ]
     if results:
         return results
     # The JSON endpoint is a Plone @search view and has changed shape before, so
     # the HTML listing is the fallback rather than the primary.
-    html = _get_html("https://vault.fbi.gov/search?SearchableText="
-                     + urllib.parse.quote(query))
+    html = _get_html("https://vault.fbi.gov/search?SearchableText=" + urllib.parse.quote(query))
     if not html:
         return []
     links = re.findall(
         rf'href="(https://{re.escape(_FBI_VAULT_HOST)}/[^"#]{{5,200}})"'
-        r'[^>]*>([^<]{5,120})</a>', html)
-    return [_result(title=title.strip(), url=found, source="fbi_vault",
-                    institution="FBI Records Vault (Declassified)", rid=found)
-            for found, title in links[:limit]]
+        r"[^>]*>([^<]{5,120})</a>",
+        html,
+    )
+    return [
+        _result(
+            title=title.strip(),
+            url=found,
+            source="fbi_vault",
+            institution="FBI Records Vault (Declassified)",
+            rid=found,
+        )
+        for found, title in links[:limit]
+    ]
 
 
 def search_ig_nobel(query: str, limit: int = 5) -> list[dict]:
@@ -2402,31 +2664,49 @@ def search_ig_nobel(query: str, limit: int = 5) -> list[dict]:
     if not html:
         return []
     titles = re.findall(
-        r'class="entry-title[^"]*">\s*<a href="([^"]+)"[^>]*>([^<]+)</a>', html, re.S)
-    excerpts = [e.strip() for e in re.findall(
-        r'class="entry-summary[^"]*">\s*<p>([^<]{10,400})</p>', html, re.S)]
-    return [_result(
-        title=title.strip(), url=link, source="ig_nobel",
-        institution="Improbable Research (Ig Nobel)",
-        snippet=excerpts[i] if i < len(excerpts) else "", rid=link,
-    ) for i, (link, title) in enumerate(titles[:limit])]
+        r'class="entry-title[^"]*">\s*<a href="([^"]+)"[^>]*>([^<]+)</a>', html, re.S
+    )
+    excerpts = [
+        e.strip()
+        for e in re.findall(r'class="entry-summary[^"]*">\s*<p>([^<]{10,400})</p>', html, re.S)
+    ]
+    return [
+        _result(
+            title=title.strip(),
+            url=link,
+            source="ig_nobel",
+            institution="Improbable Research (Ig Nobel)",
+            snippet=excerpts[i] if i < len(excerpts) else "",
+            rid=link,
+        )
+        for i, (link, title) in enumerate(titles[:limit])
+    ]
 
 
 def search_isfdb(query: str, limit: int = 5) -> list[dict]:
     """ISFDB — Internet Speculative Fiction Database. Sci-fi, horror, fantasy, pulp."""
-    html = _get_html("https://www.isfdb.org/cgi-bin/se.cgi?arg="
-                     + urllib.parse.quote(query) + "&type=Fiction+Titles")
+    html = _get_html(
+        "https://www.isfdb.org/cgi-bin/se.cgi?arg="
+        + urllib.parse.quote(query)
+        + "&type=Fiction+Titles"
+    )
     if not html:
         return []
     titles = re.findall(r'title\.cgi\?(\d+)">([^<]{3,120})</a>', html)
     authors = re.findall(r'author\.cgi\?[^"]+">([^<]+)</a>', html)
     years = re.findall(r'<td[^>]*class="[^"]*year[^"]*"[^>]*>(\d{4})</td>', html)
-    return [_result(
-        title=title.strip(), url=f"https://www.isfdb.org/cgi-bin/title.cgi?{tid}",
-        source="isfdb", institution="Internet Speculative Fiction Database",
-        snippet=authors[i] if i < len(authors) else "",
-        date=years[i] if i < len(years) else "", rid=tid,
-    ) for i, (tid, title) in enumerate(titles[:limit])]
+    return [
+        _result(
+            title=title.strip(),
+            url=f"https://www.isfdb.org/cgi-bin/title.cgi?{tid}",
+            source="isfdb",
+            institution="Internet Speculative Fiction Database",
+            snippet=authors[i] if i < len(authors) else "",
+            date=years[i] if i < len(years) else "",
+            rid=tid,
+        )
+        for i, (tid, title) in enumerate(titles[:limit])
+    ]
 
 
 def search_omdb(query: str, limit: int = 5) -> list[dict]:
@@ -2434,19 +2714,25 @@ def search_omdb(query: str, limit: int = 5) -> list[dict]:
     api_key = os.environ.get("OMDB_API_KEY", "")
     if not api_key:
         return []
-    data = _get("https://www.omdbapi.com/?s=" + urllib.parse.quote(query)
-                + f"&type=movie&apikey={api_key}")
+    data = _get(
+        "https://www.omdbapi.com/?s=" + urllib.parse.quote(query) + f"&type=movie&apikey={api_key}"
+    )
     if not data:
         return []
     results = []
     for item in (data.get("Search") or [])[:limit]:
         imdb_id = item.get("imdbID", "")
-        results.append(_result(
-            title=item.get("Title", ""),
-            url=f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "",
-            source="omdb", institution="OMDb / IMDb",
-            snippet=f"{item.get('Type', '').title()} · {item.get('Year', '')}",
-            date=item.get("Year", ""), rid=imdb_id))
+        results.append(
+            _result(
+                title=item.get("Title", ""),
+                url=f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else "",
+                source="omdb",
+                institution="OMDb / IMDb",
+                snippet=f"{item.get('Type', '').title()} · {item.get('Year', '')}",
+                date=item.get("Year", ""),
+                rid=imdb_id,
+            )
+        )
     return results
 
 
@@ -2468,114 +2754,450 @@ def search_omdb(query: str, limit: int = 5) -> list[dict]:
 
 SOURCES: dict[str, dict] = {
     # Academic
-    "openalex":         {"name": "OpenAlex",                "domain": ["academic", "science", "humanities"], "key_required": False, "hosts": ["api.openalex.org"]},
-    "core":             {"name": "CORE",                    "domain": ["academic", "science"],             "key_required": False, "hosts": ["api.core.ac.uk"]},
-    "doaj":             {"name": "DOAJ",                    "domain": ["academic", "open_access"],           "key_required": False, "hosts": ["doaj.org", "doi.org"]},
-    "europepmc":        {"name": "Europe PMC",              "domain": ["biology", "medicine", "health"],     "key_required": False, "hosts": ["doi.org", "europepmc.org", "www.ebi.ac.uk"]},
+    "openalex": {
+        "name": "OpenAlex",
+        "domain": ["academic", "science", "humanities"],
+        "key_required": False,
+        "hosts": ["api.openalex.org"],
+    },
+    "core": {
+        "name": "CORE",
+        "domain": ["academic", "science"],
+        "key_required": False,
+        "hosts": ["api.core.ac.uk"],
+    },
+    "doaj": {
+        "name": "DOAJ",
+        "domain": ["academic", "open_access"],
+        "key_required": False,
+        "hosts": ["doaj.org", "doi.org"],
+    },
+    "europepmc": {
+        "name": "Europe PMC",
+        "domain": ["biology", "medicine", "health"],
+        "key_required": False,
+        "hosts": ["doi.org", "europepmc.org", "www.ebi.ac.uk"],
+    },
     # key_required is False because `search_semantic_scholar` does not abstain
     # without SEMANTIC_SCHOLAR_API_KEY — it queries anonymously and the key only
     # lifts rate limits. This entry said True, which made `list_sources()` claim
     # a key that is not needed; the fan-out reached it keyless in every run.
-    "semantic_scholar": {"name": "Semantic Scholar",        "domain": ["academic", "cs", "science"],         "key_required": False, "hosts": ["api.semanticscholar.org", "doi.org"]},
-    "crossref":         {"name": "Crossref",                "domain": ["academic", "general"],               "key_required": False, "hosts": ["api.crossref.org", "doi.org"]},
-    "pubmed":           {"name": "PubMed",                  "domain": ["biology", "medicine"],               "key_required": False, "hosts": ["eutils.ncbi.nlm.nih.gov", "pubmed.ncbi.nlm.nih.gov"]},
-    "arxiv":            {"name": "arXiv",                   "domain": ["science", "cs", "math", "physics"],  "key_required": False, "hosts": ["export.arxiv.org"]},
+    "semantic_scholar": {
+        "name": "Semantic Scholar",
+        "domain": ["academic", "cs", "science"],
+        "key_required": False,
+        "hosts": ["api.semanticscholar.org", "doi.org"],
+    },
+    "crossref": {
+        "name": "Crossref",
+        "domain": ["academic", "general"],
+        "key_required": False,
+        "hosts": ["api.crossref.org", "doi.org"],
+    },
+    "pubmed": {
+        "name": "PubMed",
+        "domain": ["biology", "medicine"],
+        "key_required": False,
+        "hosts": ["eutils.ncbi.nlm.nih.gov", "pubmed.ncbi.nlm.nih.gov"],
+    },
+    "arxiv": {
+        "name": "arXiv",
+        "domain": ["science", "cs", "math", "physics"],
+        "key_required": False,
+        "hosts": ["export.arxiv.org"],
+    },
     # Data / Science
-    "zenodo":           {"name": "Zenodo",                  "domain": ["science", "data", "general"],        "key_required": False, "hosts": ["doi.org", "zenodo.org"]},
-    "datacite":         {"name": "DataCite",                "domain": ["science", "data"],                   "key_required": False, "hosts": ["api.datacite.org", "doi.org"]},
-    "wikidata":         {"name": "Wikidata",                "domain": ["general", "reference"],              "key_required": False, "hosts": ["www.wikidata.org"]},
-    "pubchem":          {"name": "PubChem",                 "domain": ["chemistry", "science"],              "key_required": False, "hosts": ["pubchem.ncbi.nlm.nih.gov"]},
-    "usgs":             {"name": "USGS Publications",       "domain": ["geology", "earth_science"],          "key_required": False, "hosts": ["doi.org", "pubs.er.usgs.gov"]},
-    "nasa":             {"name": "NASA",                    "domain": ["space", "science"],                  "key_required": False, "hosts": ["images-api.nasa.gov"]},
+    "zenodo": {
+        "name": "Zenodo",
+        "domain": ["science", "data", "general"],
+        "key_required": False,
+        "hosts": ["doi.org", "zenodo.org"],
+    },
+    "datacite": {
+        "name": "DataCite",
+        "domain": ["science", "data"],
+        "key_required": False,
+        "hosts": ["api.datacite.org", "doi.org"],
+    },
+    "wikidata": {
+        "name": "Wikidata",
+        "domain": ["general", "reference"],
+        "key_required": False,
+        "hosts": ["www.wikidata.org"],
+    },
+    "pubchem": {
+        "name": "PubChem",
+        "domain": ["chemistry", "science"],
+        "key_required": False,
+        "hosts": ["pubchem.ncbi.nlm.nih.gov"],
+    },
+    "usgs": {
+        "name": "USGS Publications",
+        "domain": ["geology", "earth_science"],
+        "key_required": False,
+        "hosts": ["doi.org", "pubs.er.usgs.gov"],
+    },
+    "nasa": {
+        "name": "NASA",
+        "domain": ["space", "science"],
+        "key_required": False,
+        "hosts": ["images-api.nasa.gov"],
+    },
     # Museums
-    "met":              {"name": "Met Museum",              "domain": ["art", "culture", "history"],         "key_required": False, "hosts": ["collectionapi.metmuseum.org"]},
-    "cleveland":        {"name": "Cleveland Museum of Art", "domain": ["art", "culture"],                    "key_required": False, "hosts": ["openaccess-api.clevelandart.org"]},
-    "vam":              {"name": "V&A Museum",              "domain": ["art", "design", "culture"],          "key_required": False, "hosts": ["api.vam.ac.uk", "collections.vam.ac.uk"]},
-    "rijksmuseum":      {"name": "Rijksmuseum",             "domain": ["art", "history"],                    "key_required": True, "key_env": "RIJKSMUSEUM_API_KEY", "hosts": ["www.rijksmuseum.nl"]},
+    "met": {
+        "name": "Met Museum",
+        "domain": ["art", "culture", "history"],
+        "key_required": False,
+        "hosts": ["collectionapi.metmuseum.org"],
+    },
+    "cleveland": {
+        "name": "Cleveland Museum of Art",
+        "domain": ["art", "culture"],
+        "key_required": False,
+        "hosts": ["openaccess-api.clevelandart.org"],
+    },
+    "vam": {
+        "name": "V&A Museum",
+        "domain": ["art", "design", "culture"],
+        "key_required": False,
+        "hosts": ["api.vam.ac.uk", "collections.vam.ac.uk"],
+    },
+    "rijksmuseum": {
+        "name": "Rijksmuseum",
+        "domain": ["art", "history"],
+        "key_required": True,
+        "key_env": "RIJKSMUSEUM_API_KEY",
+        "hosts": ["www.rijksmuseum.nl"],
+    },
     # Libraries & Archives
-    "loc":              {"name": "Library of Congress",     "domain": ["humanities", "history", "general"],  "key_required": False, "hosts": ["www.loc.gov"]},
-    "openlibrary":      {"name": "Open Library",            "domain": ["books", "humanities"],               "key_required": False, "hosts": ["openlibrary.org"]},
-    "chronicling_america": {"name": "Chronicling America", "domain": ["history", "journalism"],             "key_required": False, "hosts": ["www.loc.gov"]},
-    "internet_archive": {"name": "Internet Archive",        "domain": ["general", "books", "media"],         "key_required": False, "hosts": ["archive.org"]},
-    "dpla":             {"name": "DPLA",                    "domain": ["humanities", "history", "general"],  "key_required": True, "key_env": "DPLA_API_KEY", "hosts": ["api.dp.la"]},
+    "loc": {
+        "name": "Library of Congress",
+        "domain": ["humanities", "history", "general"],
+        "key_required": False,
+        "hosts": ["www.loc.gov"],
+    },
+    "openlibrary": {
+        "name": "Open Library",
+        "domain": ["books", "humanities"],
+        "key_required": False,
+        "hosts": ["openlibrary.org"],
+    },
+    "chronicling_america": {
+        "name": "Chronicling America",
+        "domain": ["history", "journalism"],
+        "key_required": False,
+        "hosts": ["www.loc.gov"],
+    },
+    "internet_archive": {
+        "name": "Internet Archive",
+        "domain": ["general", "books", "media"],
+        "key_required": False,
+        "hosts": ["archive.org"],
+    },
+    "dpla": {
+        "name": "DPLA",
+        "domain": ["humanities", "history", "general"],
+        "key_required": True,
+        "key_env": "DPLA_API_KEY",
+        "hosts": ["api.dp.la"],
+    },
     # Heritage
-    "smithsonian":      {"name": "Smithsonian",             "domain": ["art", "history", "science"],         "key_required": True, "key_env": "SMITHSONIAN_API_KEY", "hosts": ["api.si.edu"]},
-    "europeana":        {"name": "Europeana",               "domain": ["art", "culture", "history"],         "key_required": True, "key_env": "EUROPEANA_API_KEY", "hosts": ["api.europeana.eu"]},
+    "smithsonian": {
+        "name": "Smithsonian",
+        "domain": ["art", "history", "science"],
+        "key_required": True,
+        "key_env": "SMITHSONIAN_API_KEY",
+        "hosts": ["api.si.edu"],
+    },
+    "europeana": {
+        "name": "Europeana",
+        "domain": ["art", "culture", "history"],
+        "key_required": True,
+        "key_env": "EUROPEANA_API_KEY",
+        "hosts": ["api.europeana.eu"],
+    },
     # International
-    "gallica":          {"name": "Gallica (BnF)",           "domain": ["humanities", "history", "france"],   "key_required": False, "hosts": ["gallica.bnf.fr", "www.loc.gov"]},
-    "hal":              {"name": "HAL Open Access",         "domain": ["academic", "science", "france"],     "key_required": False, "hosts": ["api.archives-ouvertes.fr"]},
-    "scielo":           {"name": "SciELO",                  "domain": ["science", "latin_america", "iberia"],"key_required": False, "hosts": ["articlemeta.scielo.org", "www.scielo.br"]},
-    "ndl":              {"name": "National Diet Library",   "domain": ["general", "japan", "asia"],          "key_required": False, "hosts": ["iss.ndl.go.jp", "www.loc.gov"]},
+    "gallica": {
+        "name": "Gallica (BnF)",
+        "domain": ["humanities", "history", "france"],
+        "key_required": False,
+        "hosts": ["gallica.bnf.fr", "www.loc.gov"],
+    },
+    "hal": {
+        "name": "HAL Open Access",
+        "domain": ["academic", "science", "france"],
+        "key_required": False,
+        "hosts": ["api.archives-ouvertes.fr"],
+    },
+    "scielo": {
+        "name": "SciELO",
+        "domain": ["science", "latin_america", "iberia"],
+        "key_required": False,
+        "hosts": ["articlemeta.scielo.org", "www.scielo.br"],
+    },
+    "ndl": {
+        "name": "National Diet Library",
+        "domain": ["general", "japan", "asia"],
+        "key_required": False,
+        "hosts": ["iss.ndl.go.jp", "www.loc.gov"],
+    },
     # Music
-    "musicbrainz":      {"name": "MusicBrainz",             "domain": ["music", "art", "culture"],           "key_required": False, "hosts": ["musicbrainz.org"]},
+    "musicbrainz": {
+        "name": "MusicBrainz",
+        "domain": ["music", "art", "culture"],
+        "key_required": False,
+        "hosts": ["musicbrainz.org"],
+    },
     # Philosophy & humanities
-    "sep":              {"name": "Stanford Encyclopedia of Philosophy", "domain": ["philosophy", "humanities"], "key_required": False, "hosts": ["plato.stanford.edu"]},
+    "sep": {
+        "name": "Stanford Encyclopedia of Philosophy",
+        "domain": ["philosophy", "humanities"],
+        "key_required": False,
+        "hosts": ["plato.stanford.edu"],
+    },
     # Literature — public domain
-    "gutenberg":        {"name": "Project Gutenberg",       "domain": ["literature", "books", "humanities"], "key_required": False, "hosts": ["gutendex.com", "www.gutenberg.org"]},
+    "gutenberg": {
+        "name": "Project Gutenberg",
+        "domain": ["literature", "books", "humanities"],
+        "key_required": False,
+        "hosts": ["gutendex.com", "www.gutenberg.org"],
+    },
     # Natural history
-    "bhl":              {"name": "Biodiversity Heritage Library", "domain": ["biology", "ecology", "natural_history"], "key_required": True, "key_env": "BHL_API_KEY", "hosts": ["www.biodiversitylibrary.org"]},
+    "bhl": {
+        "name": "Biodiversity Heritage Library",
+        "domain": ["biology", "ecology", "natural_history"],
+        "key_required": True,
+        "key_env": "BHL_API_KEY",
+        "hosts": ["www.biodiversitylibrary.org"],
+    },
     # Law
     # Declassified records, prize archives, genre bibliography — recovered from
     # the archived jeles-remote fork, where they were written but never registered.
-    "fbi_vault":        {"name": "FBI Records Vault",       "domain": ["history", "government", "records"],  "key_required": False, "hosts": ["vault.fbi.gov"]},
-    "ig_nobel":         {"name": "Improbable Research",     "domain": ["science", "humor"],                  "key_required": False, "hosts": ["www.improbable.com"]},
+    "fbi_vault": {
+        "name": "FBI Records Vault",
+        "domain": ["history", "government", "records"],
+        "key_required": False,
+        "hosts": ["vault.fbi.gov"],
+    },
+    "ig_nobel": {
+        "name": "Improbable Research",
+        "domain": ["science", "humor"],
+        "key_required": False,
+        "hosts": ["www.improbable.com"],
+    },
     # opt_in: these two were plain http in the fork and their TLS is unverified.
-    "isfdb":            {"name": "ISFDB",                   "domain": ["literature", "science_fiction"],     "key_required": False, "opt_in": True, "hosts": ["www.isfdb.org"]},
-    "omdb":             {"name": "OMDb / IMDb",             "domain": ["film", "media"],                     "key_required": True, "key_env": "OMDB_API_KEY", "opt_in": True, "hosts": ["www.omdbapi.com", "www.imdb.com"]},
-    "courtlistener":    {"name": "CourtListener",           "domain": ["law", "legal"],                      "key_required": False, "hosts": ["www.courtlistener.com"]},
+    "isfdb": {
+        "name": "ISFDB",
+        "domain": ["literature", "science_fiction"],
+        "key_required": False,
+        "opt_in": True,
+        "hosts": ["www.isfdb.org"],
+    },
+    "omdb": {
+        "name": "OMDb / IMDb",
+        "domain": ["film", "media"],
+        "key_required": True,
+        "key_env": "OMDB_API_KEY",
+        "opt_in": True,
+        "hosts": ["www.omdbapi.com", "www.imdb.com"],
+    },
+    "courtlistener": {
+        "name": "CourtListener",
+        "domain": ["law", "legal"],
+        "key_required": False,
+        "hosts": ["www.courtlistener.com"],
+    },
     # Broad academic open access
-    "base":             {"name": "BASE (Bielefeld)",         "domain": ["academic", "general", "open_access"],"key_required": False, "hosts": ["api.base-search.net"]},
+    "base": {
+        "name": "BASE (Bielefeld)",
+        "domain": ["academic", "general", "open_access"],
+        "key_required": False,
+        "hosts": ["api.base-search.net"],
+    },
     # Computer science
-    "dblp":             {"name": "DBLP",                    "domain": ["computer_science", "academic"],      "key_required": False, "hosts": ["dblp.org"]},
+    "dblp": {
+        "name": "DBLP",
+        "domain": ["computer_science", "academic"],
+        "key_required": False,
+        "hosts": ["dblp.org"],
+    },
     # Drug / medical safety
-    "openfda":          {"name": "OpenFDA",                 "domain": ["medicine", "drug", "safety"],        "key_required": False, "hosts": ["api.fda.gov", "www.accessdata.fda.gov"]},
+    "openfda": {
+        "name": "OpenFDA",
+        "domain": ["medicine", "drug", "safety"],
+        "key_required": False,
+        "hosts": ["api.fda.gov", "www.accessdata.fda.gov"],
+    },
     # Species / ecology
-    "eol":              {"name": "Encyclopedia of Life",    "domain": ["biology", "ecology", "species"],     "key_required": False, "hosts": ["eol.org"]},
-    "gbif":             {"name": "GBIF",                    "domain": ["biology", "ecology", "biodiversity"],"key_required": False, "hosts": ["api.gbif.org", "www.gbif.org"]},
-    "inaturalist":      {"name": "iNaturalist",             "domain": ["biology", "ecology", "species"],     "key_required": False, "hosts": ["api.inaturalist.org", "www.inaturalist.org"]},
+    "eol": {
+        "name": "Encyclopedia of Life",
+        "domain": ["biology", "ecology", "species"],
+        "key_required": False,
+        "hosts": ["eol.org"],
+    },
+    "gbif": {
+        "name": "GBIF",
+        "domain": ["biology", "ecology", "biodiversity"],
+        "key_required": False,
+        "hosts": ["api.gbif.org", "www.gbif.org"],
+    },
+    "inaturalist": {
+        "name": "iNaturalist",
+        "domain": ["biology", "ecology", "species"],
+        "key_required": False,
+        "hosts": ["api.inaturalist.org", "www.inaturalist.org"],
+    },
     # Geography
-    "nominatim":        {"name": "OpenStreetMap Nominatim", "domain": ["geography", "places"],               "key_required": False, "hosts": ["nominatim.openstreetmap.org", "www.openstreetmap.org"]},
+    "nominatim": {
+        "name": "OpenStreetMap Nominatim",
+        "domain": ["geography", "places"],
+        "key_required": False,
+        "hosts": ["nominatim.openstreetmap.org", "www.openstreetmap.org"],
+    },
     # European open research
-    "openaire":         {"name": "OpenAIRE",                "domain": ["academic", "europe", "open_access"], "key_required": False, "hosts": ["api.openaire.eu", "doi.org"]},
+    "openaire": {
+        "name": "OpenAIRE",
+        "domain": ["academic", "europe", "open_access"],
+        "key_required": False,
+        "hosts": ["api.openaire.eu", "doi.org"],
+    },
     # Government open data
-    "federal_register": {"name": "U.S. Federal Register",  "domain": ["law", "government", "us"],           "key_required": False, "hosts": ["www.federalregister.gov"]},
-    "datagov":          {"name": "data.gov",                "domain": ["government", "data", "us"],          "key_required": False, "hosts": ["catalog.data.gov"]},
-    "uk_legislation":   {"name": "legislation.gov.uk",      "domain": ["law", "government", "uk"],           "key_required": False, "hosts": ["www.legislation.gov.uk"]},
-    "eu_data":          {"name": "data.europa.eu",          "domain": ["government", "data", "europe"],      "key_required": False, "hosts": ["data.europa.eu"]},
+    "federal_register": {
+        "name": "U.S. Federal Register",
+        "domain": ["law", "government", "us"],
+        "key_required": False,
+        "hosts": ["www.federalregister.gov"],
+    },
+    "datagov": {
+        "name": "data.gov",
+        "domain": ["government", "data", "us"],
+        "key_required": False,
+        "hosts": ["catalog.data.gov"],
+    },
+    "uk_legislation": {
+        "name": "legislation.gov.uk",
+        "domain": ["law", "government", "uk"],
+        "key_required": False,
+        "hosts": ["www.legislation.gov.uk"],
+    },
+    "eu_data": {
+        "name": "data.europa.eu",
+        "domain": ["government", "data", "europe"],
+        "key_required": False,
+        "hosts": ["data.europa.eu"],
+    },
     # Clinical trade press
-    "psychiatric_times": {"name": "Psychiatric Times",      "domain": ["psychiatry", "mental_health", "medicine"], "key_required": False, "hosts": ["www.psychiatrictimes.com"]},
+    "psychiatric_times": {
+        "name": "Psychiatric Times",
+        "domain": ["psychiatry", "mental_health", "medicine"],
+        "key_required": False,
+        "hosts": ["www.psychiatrictimes.com"],
+    },
     # High-energy physics
-    "inspirehep":       {"name": "INSPIRE-HEP",             "domain": ["physics", "high_energy_physics", "science"], "key_required": False, "hosts": ["arxiv.org", "doi.org", "inspirehep.net"]},
+    "inspirehep": {
+        "name": "INSPIRE-HEP",
+        "domain": ["physics", "high_energy_physics", "science"],
+        "key_required": False,
+        "hosts": ["arxiv.org", "doi.org", "inspirehep.net"],
+    },
     # Economics / macroeconomics
-    "worldbank":        {"name": "World Bank Open Data",    "domain": ["economics", "finance", "government"],  "key_required": False, "hosts": ["api.worldbank.org", "data.worldbank.org"]},
+    "worldbank": {
+        "name": "World Bank Open Data",
+        "domain": ["economics", "finance", "government"],
+        "key_required": False,
+        "hosts": ["api.worldbank.org", "data.worldbank.org"],
+    },
     # Food & nutrition
-    "openfoodfacts":    {"name": "Open Food Facts",         "domain": ["food", "nutrition", "science"],        "key_required": False, "hosts": ["world.openfoodfacts.org"]},
+    "openfoodfacts": {
+        "name": "Open Food Facts",
+        "domain": ["food", "nutrition", "science"],
+        "key_required": False,
+        "hosts": ["world.openfoodfacts.org"],
+    },
     # Environment / energy
-    "carbon_intensity": {"name": "UK Carbon Intensity",     "domain": ["environment", "energy", "climate"],    "key_required": False, "hosts": ["api.carbonintensity.org.uk", "carbonintensity.org.uk"]},
+    "carbon_intensity": {
+        "name": "UK Carbon Intensity",
+        "domain": ["environment", "energy", "climate"],
+        "key_required": False,
+        "hosts": ["api.carbonintensity.org.uk", "carbonintensity.org.uk"],
+    },
     # Weather
-    "nws":              {"name": "National Weather Service", "domain": ["weather", "government", "science"],    "key_required": False, "hosts": ["api.weather.gov", "www.weather.gov"]},
+    "nws": {
+        "name": "National Weather Service",
+        "domain": ["weather", "government", "science"],
+        "key_required": False,
+        "hosts": ["api.weather.gov", "www.weather.gov"],
+    },
     # News
-    "gdelt":            {"name": "GDELT",                   "domain": ["news", "current_events"],               "key_required": False, "hosts": ["api.gdeltproject.org"]},
+    "gdelt": {
+        "name": "GDELT",
+        "domain": ["news", "current_events"],
+        "key_required": False,
+        "hosts": ["api.gdeltproject.org"],
+    },
     # Public health
-    "who_gho":          {"name": "WHO Global Health Observatory", "domain": ["public_health", "medicine"],      "key_required": False, "hosts": ["ghoapi.azureedge.net", "www.who.int"]},
+    "who_gho": {
+        "name": "WHO Global Health Observatory",
+        "domain": ["public_health", "medicine"],
+        "key_required": False,
+        "hosts": ["ghoapi.azureedge.net", "www.who.int"],
+    },
     # Global weather/climate
-    "open_meteo":       {"name": "Open-Meteo",              "domain": ["climate", "weather"],                   "key_required": False, "hosts": ["api.open-meteo.com", "geocoding-api.open-meteo.com", "open-meteo.com"]},
+    "open_meteo": {
+        "name": "Open-Meteo",
+        "domain": ["climate", "weather"],
+        "key_required": False,
+        "hosts": ["api.open-meteo.com", "geocoding-api.open-meteo.com", "open-meteo.com"],
+    },
     # Patents
     # opt_in because search.patentsview.org has been DNS-dead since 2026
     # (willow-2.0 #648): every default fan-out spent a full timeout on a name
     # that does not resolve. `patents.google.com` is the half that still works,
     # so the entry stays registered and reachable by name rather than deleted.
-    "patentsview":      {"name": "USPTO PatentsView",       "domain": ["patents", "technology", "science"],     "key_required": False, "opt_in": True, "hosts": ["patents.google.com", "search.patentsview.org"]},
+    "patentsview": {
+        "name": "USPTO PatentsView",
+        "domain": ["patents", "technology", "science"],
+        "key_required": False,
+        "opt_in": True,
+        "hosts": ["patents.google.com", "search.patentsview.org"],
+    },
     # Macroeconomics
-    "imf":              {"name": "IMF DataMapper",          "domain": ["macroeconomics", "economics"],          "key_required": False, "hosts": ["www.imf.org"]},
+    "imf": {
+        "name": "IMF DataMapper",
+        "domain": ["macroeconomics", "economics"],
+        "key_required": False,
+        "hosts": ["www.imf.org"],
+    },
     # Social science preprints
-    "osf":              {"name": "Open Science Framework",  "domain": ["social_science", "psychology", "medicine"], "key_required": False, "hosts": ["api.osf.io"]},
+    "osf": {
+        "name": "Open Science Framework",
+        "domain": ["social_science", "psychology", "medicine"],
+        "key_required": False,
+        "hosts": ["api.osf.io"],
+    },
     # Sports
-    "thesportsdb":      {"name": "TheSportsDB",             "domain": ["sports"],                               "key_required": False, "hosts": ["www.thesportsdb.com"]},
+    "thesportsdb": {
+        "name": "TheSportsDB",
+        "domain": ["sports"],
+        "key_required": False,
+        "hosts": ["www.thesportsdb.com"],
+    },
     # Finance / FX
-    "frankfurter":      {"name": "ECB via Frankfurter",     "domain": ["finance", "economics"],                 "key_required": False, "hosts": ["api.frankfurter.app", "www.ecb.europa.eu"]},
+    "frankfurter": {
+        "name": "ECB via Frankfurter",
+        "domain": ["finance", "economics"],
+        "key_required": False,
+        "hosts": ["api.frankfurter.app", "www.ecb.europa.eu"],
+    },
     # Opt-in only — general reference, not suitable for academic citation
-    "wikipedia":        {"name": "Wikipedia",               "domain": ["general", "reference"],              "fn_name": "search_wikipedia",        "key_required": False, "opt_in": True, "hosts": ["en.wikipedia.org"]},
+    "wikipedia": {
+        "name": "Wikipedia",
+        "domain": ["general", "reference"],
+        "fn_name": "search_wikipedia",
+        "key_required": False,
+        "opt_in": True,
+        "hosts": ["en.wikipedia.org"],
+    },
 }
 
 # ── Static source registry ────────────────────────────────────────────────────
@@ -2621,15 +3243,15 @@ def _load_registry() -> dict[str, dict]:
     registry: dict[str, dict] = {}
     for sid, cfg in SOURCES.items():
         registry[sid] = {
-            "name":         cfg.get("name", sid),
-            "fn_name":      cfg.get("fn_name") or f"search_{sid}",
+            "name": cfg.get("name", sid),
+            "fn_name": cfg.get("fn_name") or f"search_{sid}",
             "key_required": cfg.get("key_required", False),
-            "key_env":      cfg.get("key_env", ""),
-            "opt_in":       cfg.get("opt_in", False),
+            "key_env": cfg.get("key_env", ""),
+            "opt_in": cfg.get("opt_in", False),
             # Rebuilt key by key, so anything not listed here is dropped —
             # which is how `hosts` read as empty everywhere the first time.
-            "hosts":        tuple(cfg.get("hosts", ())),
-            "enabled":      True,
+            "hosts": tuple(cfg.get("hosts", ())),
+            "enabled": True,
         }
     return registry
 
@@ -2645,108 +3267,418 @@ def _resolve_fn(fn_name: str):
 
 # High-priority history queries — checked before broad government/policy keywords.
 _HISTORY_QUERY_OVERRIDES: list[tuple[list[str], list[str]]] = [
-    (["french revolution", "revolution of 1789", "bastille", "reign of terror",
-      "napoleonic wars", "louis xvi"],
-     ["gallica", "loc", "internet_archive", "openlibrary"]),
+    (
+        [
+            "french revolution",
+            "revolution of 1789",
+            "bastille",
+            "reign of terror",
+            "napoleonic wars",
+            "louis xvi",
+        ],
+        ["gallica", "loc", "internet_archive", "openlibrary"],
+    ),
 ]
 
 _DOMAIN_ROUTES: list[tuple[list[str], list[str]]] = [
     *_HISTORY_QUERY_OVERRIDES,
-    (["law", "legal", "court", "case law", "statute", "legislation", "judicial",
-      "ruling", "verdict", "judge", "attorney", "plaintiff", "defendant",
-      "precedent", "supreme court", "amendment", "regulation", "act of congress",
-      "bill passed", "federal law", "constitution"],
-     ["courtlistener", "federal_register", "openalex"]),
-
-    (["government", "policy", "federal", "parliament", "senate", "congress",
-      "ministry", "department of", "executive order", "public sector",
-      "cabinet", "prime minister", "president policy", "uk law", "eu law",
-      "european union regulation", "government data", "open data"],
-     ["federal_register", "datagov", "uk_legislation", "eu_data"]),
-
-    (["species", "animal", "bird", "fish", "insect", "plant", "mammal",
-      "reptile", "amphibian", "fungus", "microbe", "bacteria", "wildlife",
-      "observed in the wild", "sighting", "habitat", "endangered", "iucn"],
-     ["inaturalist", "gbif", "eol", "bhl"]),
-
-    (["geography", "country", "city", "capital", "river", "mountain", "continent",
-      "population density", "location of", "where is", "coordinates", "region",
-      "territory", "border between", "nation", "province", "county", "lake",
-      "ocean", "sea", "bay", "peninsula", "island"],
-     ["nominatim", "wikidata", "openalex"]),
-
-    (["music", "song", "album", "band", "artist", "musician", "rapper", "hip hop",
-      "hip-hop", "jazz", "blues", "rock", "pop", "genre", "record", "track",
-      "lyrics", "singer", "producer", "discography", "discogs", "recording"],
-     ["musicbrainz", "openlibrary"]),
-
-    (["ship", "vessel", "hull", "marine", "nautical", "barnacle", "antifouling",
-      "corrosion", "rust", "copper", "boat", "submarine", "naval", "dock",
-      "buoyancy", "ballast", "keel"],
-     ["pubchem", "crossref", "openalex"]),
-
-    (["paint", "artwork", "sculpture", "portrait", "drawing", "exhibition",
-      "canvas", "fresco", "engraving", "watercolor", "print", "photograph",
-      "illustration", "tapestry", "mosaic", "rembrandt", "vermeer", "picasso",
-      "van gogh", "monet", "museum collection", "art history"],
-     ["met", "cleveland", "vam", "wikidata", "europeana"]),
-
-    (["psychiatry", "psychiatric", "mental health", "mental illness", "depression",
-      "anxiety", "bipolar", "schizophrenia", "psychosis", "ptsd", "adhd",
-      "autism", "ocd", "personality disorder", "substance use", "addiction",
-      "suicide", "self-harm", "antidepressant", "antipsychotic", "ssri", "snri",
-      "benzodiazepine", "therapy", "psychotherapy", "cbt", "dbt", "dsm",
-      "psychiatric medication", "mental disorder"],
-     ["psychiatric_times", "pubmed", "europepmc"]),
-
-    (["disease", "drug", "medicine", "treatment", "syndrome", "virus", "bacteria",
-      "health", "clinical", "therapy", "gene", "protein", "vaccine", "cancer",
-      "surgery", "diagnosis", "pharmacology"],
-     ["pubmed", "europepmc", "pubchem"]),
-
-    (["chemical", "compound", "molecule", "element", "reaction", "formula", "acid",
-      "polymer", "catalyst", "synthesis", "isotope"],
-     ["pubchem", "crossref", "arxiv"]),
-
-    (["physics", "quantum", "algorithm", "machine learning", "neural network",
-      "mathematics", "theorem", "computer science", "programming", "deep learning",
-      "artificial intelligence", "ai", "cryptography", "compiler"],
-     ["arxiv", "semantic_scholar", "openalex"]),
-
-    (["space", "nasa", "planet", "star", "galaxy", "asteroid", "orbit", "telescope",
-      "astronomy", "cosmos", "lunar", "solar system", "comet", "exoplanet"],
-     ["nasa", "arxiv", "openalex"]),
-
-    (["geology", "earthquake", "volcano", "mineral", "hydrology", "fossil",
-      "sediment", "tectonic", "seismic", "groundwater"],
-     ["usgs", "openalex", "zenodo"]),
-
-    (["history", "historical", "century", "war", "revolution", "colonial", "ancient",
-      "newspaper", "archive", "president", "congress", "empire", "dynasty",
-      "civil war", "world war", "medieval", "renaissance"],
-     ["loc", "chronicling_america", "internet_archive", "openlibrary"]),
-
-    (["philosophy", "ethics", "epistemology", "metaphysics", "kant", "aristotle",
-      "plato", "hegel", "nietzsche", "descartes", "hume", "wittgenstein", "locke",
-      "moral", "ontology", "phenomenology", "consciousness", "free will", "logic",
-      "categorical imperative", "utilitarianism", "existentialism"],
-     ["sep", "openalex", "crossref"]),
-
-    (["natural history", "species", "taxonomy", "ecology", "evolution", "darwin",
-      "botany", "zoology", "entomology", "ornithology", "flora", "fauna",
-      "biodiversity", "specimen", "genus", "phylum", "habitat"],
-     ["bhl", "openalex", "crossref"]),
-
-    (["book", "novel", "author", "literature", "poem", "fiction", "publish", "writer",
-      "text", "manuscript", "edition", "play", "essay", "anthology"],
-     ["gutenberg", "openlibrary", "loc"]),
-
-    (["france", "french", "paris", "napoleon", "versailles", "de gaulle",
-      "alsace", "bretagne"],
-     ["gallica", "hal", "europeana"]),
-
-    (["japan", "japanese", "tokyo", "kyoto", "manga", "samurai", "meiji"],
-     ["ndl", "openalex"]),
+    (
+        [
+            "law",
+            "legal",
+            "court",
+            "case law",
+            "statute",
+            "legislation",
+            "judicial",
+            "ruling",
+            "verdict",
+            "judge",
+            "attorney",
+            "plaintiff",
+            "defendant",
+            "precedent",
+            "supreme court",
+            "amendment",
+            "regulation",
+            "act of congress",
+            "bill passed",
+            "federal law",
+            "constitution",
+        ],
+        ["courtlistener", "federal_register", "openalex"],
+    ),
+    (
+        [
+            "government",
+            "policy",
+            "federal",
+            "parliament",
+            "senate",
+            "congress",
+            "ministry",
+            "department of",
+            "executive order",
+            "public sector",
+            "cabinet",
+            "prime minister",
+            "president policy",
+            "uk law",
+            "eu law",
+            "european union regulation",
+            "government data",
+            "open data",
+        ],
+        ["federal_register", "datagov", "uk_legislation", "eu_data"],
+    ),
+    (
+        [
+            "species",
+            "animal",
+            "bird",
+            "fish",
+            "insect",
+            "plant",
+            "mammal",
+            "reptile",
+            "amphibian",
+            "fungus",
+            "microbe",
+            "bacteria",
+            "wildlife",
+            "observed in the wild",
+            "sighting",
+            "habitat",
+            "endangered",
+            "iucn",
+        ],
+        ["inaturalist", "gbif", "eol", "bhl"],
+    ),
+    (
+        [
+            "geography",
+            "country",
+            "city",
+            "capital",
+            "river",
+            "mountain",
+            "continent",
+            "population density",
+            "location of",
+            "where is",
+            "coordinates",
+            "region",
+            "territory",
+            "border between",
+            "nation",
+            "province",
+            "county",
+            "lake",
+            "ocean",
+            "sea",
+            "bay",
+            "peninsula",
+            "island",
+        ],
+        ["nominatim", "wikidata", "openalex"],
+    ),
+    (
+        [
+            "music",
+            "song",
+            "album",
+            "band",
+            "artist",
+            "musician",
+            "rapper",
+            "hip hop",
+            "hip-hop",
+            "jazz",
+            "blues",
+            "rock",
+            "pop",
+            "genre",
+            "record",
+            "track",
+            "lyrics",
+            "singer",
+            "producer",
+            "discography",
+            "discogs",
+            "recording",
+        ],
+        ["musicbrainz", "openlibrary"],
+    ),
+    (
+        [
+            "ship",
+            "vessel",
+            "hull",
+            "marine",
+            "nautical",
+            "barnacle",
+            "antifouling",
+            "corrosion",
+            "rust",
+            "copper",
+            "boat",
+            "submarine",
+            "naval",
+            "dock",
+            "buoyancy",
+            "ballast",
+            "keel",
+        ],
+        ["pubchem", "crossref", "openalex"],
+    ),
+    (
+        [
+            "paint",
+            "artwork",
+            "sculpture",
+            "portrait",
+            "drawing",
+            "exhibition",
+            "canvas",
+            "fresco",
+            "engraving",
+            "watercolor",
+            "print",
+            "photograph",
+            "illustration",
+            "tapestry",
+            "mosaic",
+            "rembrandt",
+            "vermeer",
+            "picasso",
+            "van gogh",
+            "monet",
+            "museum collection",
+            "art history",
+        ],
+        ["met", "cleveland", "vam", "wikidata", "europeana"],
+    ),
+    (
+        [
+            "psychiatry",
+            "psychiatric",
+            "mental health",
+            "mental illness",
+            "depression",
+            "anxiety",
+            "bipolar",
+            "schizophrenia",
+            "psychosis",
+            "ptsd",
+            "adhd",
+            "autism",
+            "ocd",
+            "personality disorder",
+            "substance use",
+            "addiction",
+            "suicide",
+            "self-harm",
+            "antidepressant",
+            "antipsychotic",
+            "ssri",
+            "snri",
+            "benzodiazepine",
+            "therapy",
+            "psychotherapy",
+            "cbt",
+            "dbt",
+            "dsm",
+            "psychiatric medication",
+            "mental disorder",
+        ],
+        ["psychiatric_times", "pubmed", "europepmc"],
+    ),
+    (
+        [
+            "disease",
+            "drug",
+            "medicine",
+            "treatment",
+            "syndrome",
+            "virus",
+            "bacteria",
+            "health",
+            "clinical",
+            "therapy",
+            "gene",
+            "protein",
+            "vaccine",
+            "cancer",
+            "surgery",
+            "diagnosis",
+            "pharmacology",
+        ],
+        ["pubmed", "europepmc", "pubchem"],
+    ),
+    (
+        [
+            "chemical",
+            "compound",
+            "molecule",
+            "element",
+            "reaction",
+            "formula",
+            "acid",
+            "polymer",
+            "catalyst",
+            "synthesis",
+            "isotope",
+        ],
+        ["pubchem", "crossref", "arxiv"],
+    ),
+    (
+        [
+            "physics",
+            "quantum",
+            "algorithm",
+            "machine learning",
+            "neural network",
+            "mathematics",
+            "theorem",
+            "computer science",
+            "programming",
+            "deep learning",
+            "artificial intelligence",
+            "ai",
+            "cryptography",
+            "compiler",
+        ],
+        ["arxiv", "semantic_scholar", "openalex"],
+    ),
+    (
+        [
+            "space",
+            "nasa",
+            "planet",
+            "star",
+            "galaxy",
+            "asteroid",
+            "orbit",
+            "telescope",
+            "astronomy",
+            "cosmos",
+            "lunar",
+            "solar system",
+            "comet",
+            "exoplanet",
+        ],
+        ["nasa", "arxiv", "openalex"],
+    ),
+    (
+        [
+            "geology",
+            "earthquake",
+            "volcano",
+            "mineral",
+            "hydrology",
+            "fossil",
+            "sediment",
+            "tectonic",
+            "seismic",
+            "groundwater",
+        ],
+        ["usgs", "openalex", "zenodo"],
+    ),
+    (
+        [
+            "history",
+            "historical",
+            "century",
+            "war",
+            "revolution",
+            "colonial",
+            "ancient",
+            "newspaper",
+            "archive",
+            "president",
+            "congress",
+            "empire",
+            "dynasty",
+            "civil war",
+            "world war",
+            "medieval",
+            "renaissance",
+        ],
+        ["loc", "chronicling_america", "internet_archive", "openlibrary"],
+    ),
+    (
+        [
+            "philosophy",
+            "ethics",
+            "epistemology",
+            "metaphysics",
+            "kant",
+            "aristotle",
+            "plato",
+            "hegel",
+            "nietzsche",
+            "descartes",
+            "hume",
+            "wittgenstein",
+            "locke",
+            "moral",
+            "ontology",
+            "phenomenology",
+            "consciousness",
+            "free will",
+            "logic",
+            "categorical imperative",
+            "utilitarianism",
+            "existentialism",
+        ],
+        ["sep", "openalex", "crossref"],
+    ),
+    (
+        [
+            "natural history",
+            "species",
+            "taxonomy",
+            "ecology",
+            "evolution",
+            "darwin",
+            "botany",
+            "zoology",
+            "entomology",
+            "ornithology",
+            "flora",
+            "fauna",
+            "biodiversity",
+            "specimen",
+            "genus",
+            "phylum",
+            "habitat",
+        ],
+        ["bhl", "openalex", "crossref"],
+    ),
+    (
+        [
+            "book",
+            "novel",
+            "author",
+            "literature",
+            "poem",
+            "fiction",
+            "publish",
+            "writer",
+            "text",
+            "manuscript",
+            "edition",
+            "play",
+            "essay",
+            "anthology",
+        ],
+        ["gutenberg", "openlibrary", "loc"],
+    ),
+    (
+        ["france", "french", "paris", "napoleon", "versailles", "de gaulle", "alsace", "bretagne"],
+        ["gallica", "hal", "europeana"],
+    ),
+    (["japan", "japanese", "tokyo", "kyoto", "manga", "samurai", "meiji"], ["ndl", "openalex"]),
 ]
 
 _DEFAULT_SOURCES = ["base", "openalex", "crossref", "wikidata"]
@@ -2849,7 +3781,9 @@ _INTENT_SYSTEM_PROMPT = (
 
 
 def question_to_intent(
-    question: str, *, respond: Callable[[str, str], str] | None = None,
+    question: str,
+    *,
+    respond: Callable[[str, str], str] | None = None,
 ) -> str:
     """Extract the factual core of a natural-language question as a search phrase.
 
@@ -2901,9 +3835,15 @@ def list_sources() -> list[dict]:
     `search` puts in `skipped`."""
     registry = _load_registry()
     return [
-        {"id": sid, "name": cfg["name"], "fn_name": cfg["fn_name"],
-         "key_required": cfg["key_required"], "key_env": cfg.get("key_env", ""),
-         "opt_in": cfg.get("opt_in", False), "hosts": list(cfg.get("hosts", ()))}
+        {
+            "id": sid,
+            "name": cfg["name"],
+            "fn_name": cfg["fn_name"],
+            "key_required": cfg["key_required"],
+            "key_env": cfg.get("key_env", ""),
+            "opt_in": cfg.get("opt_in", False),
+            "hosts": list(cfg.get("hosts", ())),
+        }
         for sid, cfg in registry.items()
     ]
 
@@ -2954,12 +3894,23 @@ def registered_hosts(*, include_opt_in: bool = True) -> set[str]:
 # it to every dispatched source, an explicit `sources=[...]` list included, so
 # naming a structured source directly does not bypass the gate — the mismatch
 # is the same either way.
-PROSE_UNSAFE_SOURCES = frozenset({
-    "pubchem", "openfda", "datagov", "eu_data",          # named in willow-2.0 #650
-    "frankfurter", "imf", "worldbank",                    # rates / macro indicators
-    "open_meteo", "nws", "carbon_intensity",              # weather / grid
-    "thesportsdb", "who_gho", "nominatim",                # sports / health stats / geocoding
-})
+PROSE_UNSAFE_SOURCES = frozenset(
+    {
+        "pubchem",
+        "openfda",
+        "datagov",
+        "eu_data",  # named in willow-2.0 #650
+        "frankfurter",
+        "imf",
+        "worldbank",  # rates / macro indicators
+        "open_meteo",
+        "nws",
+        "carbon_intensity",  # weather / grid
+        "thesportsdb",
+        "who_gho",
+        "nominatim",  # sports / health stats / geocoding
+    }
+)
 
 _PROSE_WORD_THRESHOLD = 6
 
@@ -3043,7 +3994,8 @@ def _write_cache(query: str, results: dict[str, list]) -> None:
                     url = hit.get("url", "")
                     cache_id = (
                         hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()[:8]
-                        if url else ""
+                        if url
+                        else ""
                     )
                     keywords = list(dict.fromkeys([*query_words, source_id, *domain_tags]))[:10]
                     tags = [source_id, f"query:{query_hash}", *domain_tags]
@@ -3155,8 +4107,11 @@ def search(
     if sources:
         requested = list(sources)
     else:
-        requested = [sid for sid, cfg in registry.items()
-                     if not cfg.get("opt_in") and cfg.get("enabled", True)]
+        requested = [
+            sid
+            for sid, cfg in registry.items()
+            if not cfg.get("opt_in") and cfg.get("enabled", True)
+        ]
 
     prose = _is_prose(query)
 
@@ -3263,8 +4218,9 @@ def search(
                             continue
                     timed_out.append(sid)
                 log.warning(
-                    "jeles.search wall-clock limit %.1fs reached — %d source(s) "
-                    "timed out", wall_clock_limit, len(timed_out),
+                    "jeles.search wall-clock limit %.1fs reached — %d source(s) timed out",
+                    wall_clock_limit,
+                    len(timed_out),
                 )
         finally:
             # Never `wait=True`: the whole point is that this call does not hold

@@ -27,14 +27,14 @@ transient 403 behind CDN bot protection into a permanent claim.
 Stdlib only, and no I/O at import: cards are read on first use and cached. The
 package is `jeles`, whose whole point is that importing it costs nothing.
 """
+
 from __future__ import annotations
 
 import json
 from functools import lru_cache
 from pathlib import Path
 
-__all__ = ["CUSTODY", "ROLES", "STATUS", "CardError", "card", "cards", "hosts",
-           "hosts_with_role"]
+__all__ = ["CUSTODY", "ROLES", "STATUS", "CardError", "card", "cards", "hosts", "hosts_with_role"]
 
 #: A host's relationship to jeles. `namespace` is not a network relationship at
 #: all — it is an XML namespace URI that happens to be spelled like a URL, which
@@ -113,8 +113,7 @@ def cards() -> dict[str, dict]:
             raise CardError(f"{path.name}: unreadable ({e})") from e
         _validate(data, path.name)
         if path.stem != data["host"]:
-            raise CardError(
-                f"{path.name}: filename says {path.stem!r}, card says {data['host']!r}")
+            raise CardError(f"{path.name}: filename says {path.stem!r}, card says {data['host']!r}")
         out[data["host"]] = data
     return out
 

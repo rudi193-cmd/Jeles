@@ -12,6 +12,7 @@ string literals, so it sees `https://doi.org/{doi}` and is blind to
 `item.get("url")`. A curator may therefore add a `citation` role the AST cannot
 see, and must never be able to remove one it can.
 """
+
 from __future__ import annotations
 
 import ast
@@ -30,11 +31,13 @@ _NSPAT = re.compile(r"/zing/|xmlns|/Atom|/ns/")
 
 # ── The set matches the registry ─────────────────────────────────────────────
 
+
 def test_every_registered_host_has_a_card():
     missing = sorted(set(sources.registered_hosts()) - set(C.cards()))
     assert not missing, (
         f"hosts in SOURCES with no card: {missing}. Add jeles/cards/<host>.json "
-        "— a host with no card is a host nothing downstream can reason about.")
+        "— a host with no card is a host nothing downstream can reason about."
+    )
 
 
 def test_no_card_describes_a_host_jeles_no_longer_queries():
@@ -53,14 +56,20 @@ def test_the_catalog_is_not_accidentally_empty():
 
 # ── The cards agree with the code ────────────────────────────────────────────
 
+
 def _strings(node) -> list[str]:
     out = []
     for x in ast.walk(node):
         if isinstance(x, ast.Constant) and isinstance(x.value, str):
             out.append(x.value)
         elif isinstance(x, ast.JoinedStr):
-            out.append("".join(p.value for p in x.values
-                               if isinstance(p, ast.Constant) and isinstance(p.value, str)))
+            out.append(
+                "".join(
+                    p.value
+                    for p in x.values
+                    if isinstance(p, ast.Constant) and isinstance(p.value, str)
+                )
+            )
     return out
 
 
@@ -82,11 +91,13 @@ def _roles_from_source() -> dict[str, set[str]]:
                         if isinstance(kw.value, ast.Name):
                             names.add(kw.value.id)
         for node in ast.walk(fn):
-            if isinstance(node, ast.Assign) and {t.id for t in node.targets
-                                                 if isinstance(t, ast.Name)} & names:
+            if (
+                isinstance(node, ast.Assign)
+                and {t.id for t in node.targets if isinstance(t, ast.Name)} & names
+            ):
                 emitted += _strings(node.value)
         emitted = set(emitted)
-        for host in (cfg.get("hosts") or []):
+        for host in cfg.get("hosts") or []:
             bucket = roles.setdefault(host, set())
             for text in _strings(fn):
                 if host not in text:
@@ -117,7 +128,8 @@ def test_every_role_the_code_proves_is_on_the_card():
     assert not lost, (
         "the code proves these roles and the cards do not carry them: "
         f"{lost}. Roles may be added by a curator (runtime-built URLs are "
-        "invisible to the AST) but never removed below what sources.py shows.")
+        "invisible to the AST) but never removed below what sources.py shows."
+    )
 
 
 def test_the_derivation_still_finds_something():
@@ -146,7 +158,7 @@ def test_the_string_walk_catches_plain_and_f_string_literals():
     # the stronger assertion anyway — nothing else may be in the walk.
     assert set(_strings(tree)) == {
         "https://plain.example.org/item",
-        "https://fmt.example.org/",      # the f-string's constant prefix
+        "https://fmt.example.org/",  # the f-string's constant prefix
         "nested.example.org",
     }
 
@@ -168,9 +180,13 @@ def test_the_role_derivation_catches_each_planted_role(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setattr(sources, "__file__", str(fake))
-    monkeypatch.setattr(sources, "SOURCES", {
-        "planted": {"hosts": ["cite.example.org", "query.example.net", "www.loc.gov"]},
-    })
+    monkeypatch.setattr(
+        sources,
+        "SOURCES",
+        {
+            "planted": {"hosts": ["cite.example.org", "query.example.net", "www.loc.gov"]},
+        },
+    )
     # Hosts are matched as substrings of each literal, so the three are chosen
     # not to contain one another — or the query host would also be "cited".
     assert _roles_from_source() == {
@@ -207,10 +223,17 @@ def test_a_namespace_only_host_owes_no_citability_verdict(tmp_path, monkeypatch)
     """
     monkeypatch.setattr(C, "_DIR", tmp_path)
     C.cards.cache_clear()
-    (tmp_path / "schema.example.org.json").write_text(json.dumps({
-        "host": "schema.example.org", "roles": ["namespace"],
-        "publisher": "Example Standards Body", "custody": "institutional",
-        "status": "live"}))
+    (tmp_path / "schema.example.org.json").write_text(
+        json.dumps(
+            {
+                "host": "schema.example.org",
+                "roles": ["namespace"],
+                "publisher": "Example Standards Body",
+                "custody": "institutional",
+                "status": "live",
+            }
+        )
+    )
     try:
         assert C.hosts_with_role("namespace") == ["schema.example.org"]
         assert C.hosts_with_role("citation") == []
@@ -221,6 +244,7 @@ def test_a_namespace_only_host_owes_no_citability_verdict(tmp_path, monkeypatch)
 
 # ── Schema ───────────────────────────────────────────────────────────────────
 
+
 def test_every_card_validates_and_the_filename_matches_its_host():
     # `cards()` validates on read, so simply loading is the assertion. Kept
     # explicit because a future lazy/partial loader would make that implicit.
@@ -230,8 +254,7 @@ def test_every_card_validates_and_the_filename_matches_its_host():
         assert data["host"] == host
 
 
-@pytest.mark.parametrize("field,allowed", [
-    ("custody", C.CUSTODY), ("status", C.STATUS)])
+@pytest.mark.parametrize("field,allowed", [("custody", C.CUSTODY), ("status", C.STATUS)])
 def test_enum_fields_stay_inside_their_enum(field, allowed):
     bad = {h: c[field] for h, c in C.cards().items() if c[field] not in allowed}
     assert not bad, f"{field} outside {sorted(allowed)}: {bad}"
@@ -259,14 +282,22 @@ def test_no_card_carries_a_measured_reachability_field():
 
     `status` carries the decision. This test keeps the measurement out.
     """
-    banned = {"observed", "reachable", "http_status", "last_checked", "checked",
-              "etag", "fingerprint"}
+    banned = {
+        "observed",
+        "reachable",
+        "http_status",
+        "last_checked",
+        "checked",
+        "etag",
+        "fingerprint",
+    }
     for host, c in C.cards().items():
         leaked = banned & set(c)
         assert not leaked, (
             f"{host}: {sorted(leaked)} is a probe measurement. Reachability "
             "belongs in a report and an issue; only `status` lands on the card, "
-            "set by a human merging a PR. See docs/design/host-cards.md §6.2.")
+            "set by a human merging a PR. See docs/design/host-cards.md §6.2."
+        )
 
 
 def test_a_bad_card_is_refused_rather_than_half_read(tmp_path, monkeypatch):
@@ -274,9 +305,17 @@ def test_a_bad_card_is_refused_rather_than_half_read(tmp_path, monkeypatch):
     load with a field a consumer will branch on and get wrong."""
     monkeypatch.setattr(C, "_DIR", tmp_path)
     C.cards.cache_clear()
-    (tmp_path / "example.org.json").write_text(json.dumps({
-        "host": "example.org", "roles": ["query"], "publisher": "Example",
-        "custody": "totally-made-up", "status": "live"}))
+    (tmp_path / "example.org.json").write_text(
+        json.dumps(
+            {
+                "host": "example.org",
+                "roles": ["query"],
+                "publisher": "Example",
+                "custody": "totally-made-up",
+                "status": "live",
+            }
+        )
+    )
     with pytest.raises(C.CardError, match="unknown custody"):
         C.cards()
     C.cards.cache_clear()
@@ -285,15 +324,24 @@ def test_a_bad_card_is_refused_rather_than_half_read(tmp_path, monkeypatch):
 def test_a_filename_that_disagrees_with_its_host_is_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(C, "_DIR", tmp_path)
     C.cards.cache_clear()
-    (tmp_path / "wrong-name.json").write_text(json.dumps({
-        "host": "example.org", "roles": ["query"], "publisher": "Example",
-        "custody": "commercial", "status": "live"}))
+    (tmp_path / "wrong-name.json").write_text(
+        json.dumps(
+            {
+                "host": "example.org",
+                "roles": ["query"],
+                "publisher": "Example",
+                "custody": "commercial",
+                "status": "live",
+            }
+        )
+    )
     with pytest.raises(C.CardError, match="filename says"):
         C.cards()
     C.cards.cache_clear()
 
 
 # ── The point of the exercise ────────────────────────────────────────────────
+
 
 def test_the_citation_set_is_much_smaller_than_the_host_set():
     """The measurable win, pinned. A consumer's trust policy owes a verdict on
@@ -303,7 +351,8 @@ def test_the_citation_set_is_much_smaller_than_the_host_set():
     citation = C.hosts_with_role("citation")
     assert 0 < len(citation) < len(C.cards()) * 0.75, (
         f"{len(citation)} of {len(C.cards())} hosts are citation-capable — if "
-        "that ratio approaches 1 the role field has stopped doing any work")
+        "that ratio approaches 1 the role field has stopped doing any work"
+    )
 
 
 def test_no_host_reaches_a_trust_verdict_from_this_package():
@@ -319,4 +368,5 @@ def test_no_host_reaches_a_trust_verdict_from_this_package():
         leaked = banned & set(c)
         assert not leaked, (
             f"{host}: {sorted(leaked)} is a verdict, not a fact about the host. "
-            "See docs/design/host-cards.md §2 — consumers keep their own policy.")
+            "See docs/design/host-cards.md §2 — consumers keep their own policy."
+        )

@@ -34,6 +34,7 @@ module only verifies, which is the same asymmetry Nestor's own README leans
 on for its client-signed seals (Nestor#17): the party that can check a
 signature is not thereby able to forge one.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -146,8 +147,7 @@ def describe() -> dict[str, Any]:
         "installed": True,
         "signing_enabled": enabled,
         "ready": enabled,
-        "reason": "ok" if enabled
-        else "no NESTOR_SEAL_KEY or keyring configured on this instance",
+        "reason": "ok" if enabled else "no NESTOR_SEAL_KEY or keyring configured on this instance",
     }
 
 
@@ -214,7 +214,7 @@ def verify_human_write(
 
     signing = _import_nestor()
     if signing is None:
-        return False, "nestor extra not installed (pip install \"jeles[nestor]\")"
+        return False, 'nestor extra not installed (pip install "jeles[nestor]")'
 
     try:
         if not signing.signing_enabled():

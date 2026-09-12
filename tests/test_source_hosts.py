@@ -20,6 +20,7 @@ The one exemption is `NAMESPACE_URI_HOSTS`: XML/RDF namespace identifiers look
 like URLs and are never contacted. willow-mcp's trusted-domain list had picked
 up `www.w3.org` from arXiv's Atom namespace and treated it as an institution.
 """
+
 from __future__ import annotations
 
 import ast
@@ -47,7 +48,7 @@ def _literal_hosts(fn: ast.FunctionDef) -> set[str]:
                 if isinstance(value, ast.Constant) and isinstance(value.value, str):
                     text += value.value
                 else:
-                    break          # stop at the first interpolation
+                    break  # stop at the first interpolation
         for match in _URL_RE.findall(text):
             host = (urlparse(match).netloc or "").lower()
             if host and "{" not in host and "%" not in host:
@@ -71,7 +72,9 @@ def test_the_host_scan_catches_every_planted_literal_shape():
         "    return a, b, c, d\n"
     ).body[0]
     assert _literal_hosts(fn) == {
-        "plain.example.org", "fmt.example.org", "insecure.example.org",
+        "plain.example.org",
+        "fmt.example.org",
+        "insecure.example.org",
     }
 
 
@@ -173,18 +176,20 @@ def test_no_source_reaches_for_plain_http():
 
     offenders = {}
     for name, fn in _FUNCS.items():
-        bad = sorted({
-            m.group(0) for node in ast.walk(fn)
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-            for m in [_URL_RE.match(node.value)]
-            if m and m.group(0).startswith("http://")
-            and m.group(0) not in namespace_uris
-        })
+        bad = sorted(
+            {
+                m.group(0)
+                for node in ast.walk(fn)
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                for m in [_URL_RE.match(node.value)]
+                if m and m.group(0).startswith("http://") and m.group(0) not in namespace_uris
+            }
+        )
         if bad:
             offenders[name] = bad
     assert not offenders, (
-        f"these source functions use plain http on an https-only lane: "
-        f"{offenders}")
+        f"these source functions use plain http on an https-only lane: {offenders}"
+    )
 
 
 def test_the_sources_recovered_from_the_archived_fork_are_reachable():
@@ -207,8 +212,9 @@ def test_the_sources_recovered_from_the_archived_fork_are_reachable():
     unverified_tls = {"isfdb", "omdb"}
     for sid in unverified_tls:
         assert sources.SOURCES[sid].get("opt_in") is True, (
-            f"{sid} was plain http in the fork; it stays opt-in until its TLS "
-            f"is confirmed")
+            f"{sid} was plain http in the fork; it stays opt-in until its TLS is confirmed"
+        )
     for sid in recovered - unverified_tls:
         assert not sources.SOURCES[sid].get("opt_in"), (
-            f"{sid} was already https upstream — no reason to hold it back")
+            f"{sid} was already https upstream — no reason to hold it back"
+        )

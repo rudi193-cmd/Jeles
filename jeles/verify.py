@@ -70,6 +70,7 @@ first — ``{**hit, "source": hit["institution"] or hit["source"]}`` — before
 calling :func:`verify_claims`. See ``sources._result``'s docstring for the
 other half of this.
 """
+
 from __future__ import annotations
 
 import re
@@ -132,19 +133,19 @@ def _parse_claim_lines(raw: str) -> list[tuple[str, list[int]]]:
         head = _CLAIM_RE.search(line)
         if head is None:
             continue
-        body = line[head.end():]
+        body = line[head.end() :]
         claim_part, separator, tail = body.partition("||")
         if not separator:
             marker = _SOURCES_RE.search(body)
             if marker is None:
                 claim_part, tail = body, ""
             else:
-                claim_part, tail = body[:marker.start()], body[marker.start():]
+                claim_part, tail = body[: marker.start()], body[marker.start() :]
         claim = claim_part.strip(" \t\r\n-•|")
         if not claim:
             continue
         marker = _SOURCES_RE.search(tail)
-        src_text = tail[marker.end():] if marker else ""
+        src_text = tail[marker.end() :] if marker else ""
         nums: list[int] = []
         for token in _DIGITS_RE.findall(src_text):
             n = int(token)
@@ -300,11 +301,13 @@ def verify_claims(
         valid_nums = [n for n in nums if n in key_by_n]
         keys = {key_by_n[n] for n in valid_nums}
         named = sorted(display_by_key[k] for k in keys if k)
-        claims.append({
-            "claim": text,
-            "sources": valid_nums,
-            "institutions": named,
-            "verdict": _verdict(named, bool(valid_nums), min_institutions),
-        })
+        claims.append(
+            {
+                "claim": text,
+                "sources": valid_nums,
+                "institutions": named,
+                "verdict": _verdict(named, bool(valid_nums), min_institutions),
+            }
+        )
 
     return {"claims": claims, "summary": _summary(claims)}

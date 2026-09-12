@@ -56,6 +56,7 @@ Output schema per claim:
 `source_rank` is the publisher's rank, never the match's quality; `overlap` is
 how much of the claim the returned document actually says. See `verify_claim`.
 """
+
 from __future__ import annotations
 
 import logging
@@ -77,15 +78,17 @@ __all__ = ["PRESS_SOURCES", "extract_claims", "verify_claim", "verify_text"]
 # harmless: membership is only ever checked against source IDs
 # `sources.search` actually returned, so an unregistered key simply never
 # matches.
-PRESS_SOURCES: frozenset[str] = frozenset({
-    "psychiatric_times",
-    "stat_news",
-    "medscape",
-    "ig_nobel",
-    "fbi_vault",
-    "isfdb",
-    "omdb",
-})
+PRESS_SOURCES: frozenset[str] = frozenset(
+    {
+        "psychiatric_times",
+        "stat_news",
+        "medscape",
+        "ig_nobel",
+        "fbi_vault",
+        "isfdb",
+        "omdb",
+    }
+)
 
 _EXTRACT_SYSTEM = (
     "Extract the distinct verifiable factual claims from the passage below. "
@@ -278,17 +281,17 @@ def verify_claim(
             if conf > best_conf:
                 best_conf = conf
                 best = {
-                    "claim":       claim,
-                    "matched":     True,
-                    "title":       (hit.get("title") or "").strip(),
-                    "url":         hit.get("url", ""),
-                    "date":        hit.get("date", ""),
-                    "source":      source_id,
+                    "claim": claim,
+                    "matched": True,
+                    "title": (hit.get("title") or "").strip(),
+                    "url": hit.get("url", ""),
+                    "date": hit.get("date", ""),
+                    "source": source_id,
                     "institution": hit.get("institution", source_id),
-                    "tier":        "press" if source_id in PRESS_SOURCES else "academic",
+                    "tier": "press" if source_id in PRESS_SOURCES else "academic",
                     "source_rank": conf,
-                    "overlap":     _overlap(claim, hit),
-                    "relevance":   "unjudged",
+                    "overlap": _overlap(claim, hit),
+                    "relevance": "unjudged",
                 }
 
     if best:
@@ -303,17 +306,17 @@ def verify_claim(
         return best
 
     return {
-        "claim":       claim,
-        "matched":     False,
-        "title":       "",
-        "url":         "",
-        "date":        "",
-        "source":      "",
+        "claim": claim,
+        "matched": False,
+        "title": "",
+        "url": "",
+        "date": "",
+        "source": "",
         "institution": "",
-        "tier":        "",
+        "tier": "",
         "source_rank": 0.0,
-        "overlap":     0.0,
-        "relevance":   "unjudged",
+        "overlap": 0.0,
+        "relevance": "unjudged",
     }
 
 
@@ -340,8 +343,7 @@ def verify_text(
     """
     claims = extract_claims(text, llm_respond)
     if not claims:
-        return {"claims": [], "total": 0, "matched": 0,
-                "note": "No verifiable claims found."}
+        return {"claims": [], "total": 0, "matched": 0, "note": "No verifiable claims found."}
 
     results = [verify_claim(c, sources, limit) for c in claims]
     matched = sum(1 for r in results if r.get("matched"))

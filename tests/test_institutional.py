@@ -11,6 +11,7 @@ file pins is the layer above it:
 Nothing here makes a request: the local lane is driven with a stubbed
 `sources.search`, and the remote lane with a stubbed `urlopen`.
 """
+
 from __future__ import annotations
 
 import io
@@ -42,16 +43,21 @@ def _stub_local(monkeypatch, results=None, **kw):
     # The full accounting contract by default — every dispatched source lands in
     # exactly one of results/skipped/failed/timed_out. `_legacy_payload` below
     # builds the older shape on purpose, for the version-skew cases.
-    payload = {"query": "q", "sources_queried": ["arxiv", "loc"],
-               "total": sum(len(v) for v in (results or {}).values()),
-               "results": results or {},
-               "failed": {}, "skipped": {}, "timed_out": [], "unknown": []}
+    payload = {
+        "query": "q",
+        "sources_queried": ["arxiv", "loc"],
+        "total": sum(len(v) for v in (results or {}).values()),
+        "results": results or {},
+        "failed": {},
+        "skipped": {},
+        "timed_out": [],
+        "unknown": [],
+    }
     payload.update(kw)
     calls = []
 
     def fake(query, sources=None, limit_per_source=3, **_):
-        calls.append({"query": query, "sources": sources,
-                      "limit_per_source": limit_per_source})
+        calls.append({"query": query, "sources": sources, "limit_per_source": limit_per_source})
         if isinstance(payload, Exception):
             raise payload
         return payload
@@ -69,6 +75,7 @@ def _stub_remote(monkeypatch, payload, capture=None):
         if isinstance(payload, Exception):
             raise payload
         return _Resp(json.dumps(payload).encode())
+
     monkeypatch.setattr(urllib.request, "urlopen", fake)
 
 
@@ -112,6 +119,7 @@ def test_describe_remote_never_leaks_the_secret(monkeypatch):
 def test_describe_remote_makes_no_request(monkeypatch):
     def explode(*a, **k):
         raise AssertionError("describe_remote must not touch the network")
+
     monkeypatch.setattr(urllib.request, "urlopen", explode)
     assert inst.describe_remote()["lane"] == "local"
 
@@ -119,14 +127,16 @@ def test_describe_remote_makes_no_request(monkeypatch):
 def test_list_sources_is_local_knowledge(monkeypatch):
     def explode(*a, **k):
         raise AssertionError("listing sources must not touch the network")
+
     monkeypatch.setattr(urllib.request, "urlopen", explode)
 
     listed = inst.list_sources()
     assert len(listed) >= 50
     assert set(listed[0]) == {"id", "name", "key_required", "key_env", "opt_in"}
     keyed = [s for s in listed if s["key_required"]]
-    assert keyed and all(s["key_env"] for s in keyed), \
+    assert keyed and all(s["key_env"] for s in keyed), (
         "a source that needs a key must name the variable, not just say it needs one"
+    )
     assert any(s["key_required"] for s in listed), "some sources need keys"
 
 
@@ -134,24 +144,35 @@ def test_list_sources_is_local_knowledge(monkeypatch):
 
 
 def test_local_search_runs_in_process(monkeypatch):
-    calls = _stub_local(monkeypatch, results={"arxiv": [
-        {"title": "Signed policy bundles", "url": "https://arxiv.org/abs/1",
-         "source": "arxiv", "institution": "arXiv / Cornell University",
-         "snippet": "abstract", "date": "2026-01-01", "id": "1"}]})
+    calls = _stub_local(
+        monkeypatch,
+        results={
+            "arxiv": [
+                {
+                    "title": "Signed policy bundles",
+                    "url": "https://arxiv.org/abs/1",
+                    "source": "arxiv",
+                    "institution": "arXiv / Cornell University",
+                    "snippet": "abstract",
+                    "date": "2026-01-01",
+                    "id": "1",
+                }
+            ]
+        },
+    )
 
-    out = inst.search_institutional("policy", sources_filter=["arxiv"],
-                                    limit_per_source=2)
+    out = inst.search_institutional("policy", sources_filter=["arxiv"], limit_per_source=2)
 
     assert out["lane"] == "local"
     assert out["ok"] is True
-    assert calls == [{"query": "policy", "sources": ["arxiv"],
-                      "limit_per_source": 2}]
+    assert calls == [{"query": "policy", "sources": ["arxiv"], "limit_per_source": 2}]
     assert out["hits"][0]["source"] == "arXiv / Cornell University"
 
 
 def test_local_failure_is_reported_not_swallowed(monkeypatch):
-    monkeypatch.setattr(inst.sources, "search",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        inst.sources, "search", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
     out = inst.search_institutional("q")
     assert (out["ok"], out["hits"], out["lane"]) == (False, [], "local")
     assert "boom" in out["error"]
@@ -164,12 +185,19 @@ def test_an_empty_shelf_is_not_a_failure(monkeypatch):
 
 
 def test_grouped_results_are_flattened_with_the_group_kept_as_a_tag(monkeypatch):
-    _stub_local(monkeypatch, results={
-        "arxiv": [{"title": "A", "url": "https://arxiv.org/abs/1",
-                   "institution": "arXiv"}],
-        "loc": [{"title": "B", "url": "https://loc.gov/item/2",
-                 "institution": "Library of Congress"}],
-    })
+    _stub_local(
+        monkeypatch,
+        results={
+            "arxiv": [{"title": "A", "url": "https://arxiv.org/abs/1", "institution": "arXiv"}],
+            "loc": [
+                {
+                    "title": "B",
+                    "url": "https://loc.gov/item/2",
+                    "institution": "Library of Congress",
+                }
+            ],
+        },
+    )
     out = inst.search_institutional("q")
 
     assert len(out["hits"]) == 2
@@ -186,17 +214,16 @@ def test_grouped_results_are_flattened_with_the_group_kept_as_a_tag(monkeypatch)
 def test_remote_request_matches_the_service_contract(monkeypatch):
     monkeypatch.setenv("JELES_REMOTE_URL", "https://remote.example")
     monkeypatch.setenv("JELES_REMOTE_SECRET", SECRET)
-    monkeypatch.setattr(inst.sources, "search",
-                        lambda *a, **k: pytest.fail("must not fan out locally"))
+    monkeypatch.setattr(
+        inst.sources, "search", lambda *a, **k: pytest.fail("must not fan out locally")
+    )
     cap = {}
-    _stub_remote(monkeypatch, {"sources_queried": [], "total": 0, "results": {}},
-                 capture=cap)
+    _stub_remote(monkeypatch, {"sources_queried": [], "total": 0, "results": {}}, capture=cap)
 
     inst.search_institutional("q", sources_filter=["arxiv"], limit_per_source=2)
 
     assert cap["url"] == "https://remote.example/search"
-    assert cap["body"] == {"query": "q", "limit_per_source": 2,
-                           "sources": ["arxiv"]}
+    assert cap["body"] == {"query": "q", "limit_per_source": 2, "sources": ["arxiv"]}
     headers = {k.lower(): v for k, v in cap["headers"].items()}
     # A raw shared secret, not a Bearer token — the service hmac-compares it.
     assert headers["x-jeles-secret"] == SECRET
@@ -217,6 +244,7 @@ def test_a_misconfigured_remote_never_calls_out(monkeypatch):
 
     def explode(*a, **k):
         raise AssertionError("must not call a remote with no secret")
+
     monkeypatch.setattr(urllib.request, "urlopen", explode)
 
     out = inst.search_institutional("q")
@@ -256,8 +284,13 @@ def test_non_http_remote_url_is_refused(monkeypatch):
 def test_institutional_hits_get_their_own_confidence_rung():
     """Not `verified` (nobody checked it) and not `unverified` (a named body
     published it). Collapsing it either way discards the point of the hop."""
-    hit = inst.to_hit({"title": "t", "url": "https://arxiv.org/abs/1",
-                       "institution": "arXiv / Cornell University"})
+    hit = inst.to_hit(
+        {
+            "title": "t",
+            "url": "https://arxiv.org/abs/1",
+            "institution": "arXiv / Cornell University",
+        }
+    )
     assert hit["confidence"] == "institutional"
     assert hit["source_id"] == "institutional"
     assert hit["verification_kind"] == "institutional"
@@ -267,10 +300,11 @@ def test_institutional_hits_get_their_own_confidence_rung():
 def test_institutional_hits_carry_the_same_keys_as_corpus_hits():
     """The merge contract across all three hops."""
     from jeles import corpus
-    hit = inst.to_hit({"title": "t", "url": "https://arxiv.org/abs/1",
-                       "institution": "arXiv"})
+
+    hit = inst.to_hit({"title": "t", "url": "https://arxiv.org/abs/1", "institution": "arXiv"})
     nugget = corpus.to_search_hit(
-        {"question": "q?", "answer": "a", "sources": ["s"], "verified_by": "human"})
+        {"question": "q?", "answer": "a", "sources": ["s"], "verified_by": "human"}
+    )
     assert set(hit) == set(nugget)
 
 
@@ -294,10 +328,12 @@ def test_all_sources_failing_is_reported_as_a_failure(monkeypatch):
     """Found live: a sandbox blocking egress returned ok=true, total=0 — the
     same lie the web hop used to tell, one level down. If everything we asked
     failed, we did not look."""
-    _stub_local(monkeypatch, results={},
-                sources_queried=["arxiv", "crossref"],
-                failed={"arxiv": "URLError: tunnel 403",
-                        "crossref": "URLError: tunnel 403"})
+    _stub_local(
+        monkeypatch,
+        results={},
+        sources_queried=["arxiv", "crossref"],
+        failed={"arxiv": "URLError: tunnel 403", "crossref": "URLError: tunnel 403"},
+    )
     out = inst.search_institutional("q")
 
     assert out["ok"] is False
@@ -324,15 +360,18 @@ def test_the_default_configuration_outage_is_caught(monkeypatch):
     """The real shape of a blocked-egress run: most sources fail, and the
     key-required ones abstain without ever reaching the network."""
     _stub_local(
-        monkeypatch, results={},
+        monkeypatch,
+        results={},
         sources_queried=[f"s{i}" for i in range(60)],
         failed={f"s{i}": "URLError: tunnel 403" for i in range(55)},
-        skipped={f"s{i}": "no EUROPEANA_KEY" for i in range(55, 60)})
+        skipped={f"s{i}": "no EUROPEANA_KEY" for i in range(55, 60)},
+    )
     out = inst.search_institutional("q")
 
     assert out["ok"] is False, (
         "55 failed + 5 abstained of 60 is an outage; the old ratio test read "
-        "55 >= 60 as False and called it an empty shelf")
+        "55 >= 60 as False and called it an empty shelf"
+    )
     assert "55 could not be reached" in out["error"]
     assert "5 abstained" in out["error"]
     assert out["skipped"], "an abstention is reported, not swallowed"
@@ -341,8 +380,12 @@ def test_the_default_configuration_outage_is_caught(monkeypatch):
 def test_an_abstention_alone_is_not_a_successful_look(monkeypatch):
     """Every source needing a key nobody has set is a configuration problem
     that reads exactly like an empty library."""
-    _stub_local(monkeypatch, results={}, sources_queried=["europeana", "dpla"],
-                skipped={"europeana": "no EUROPEANA_KEY", "dpla": "no DPLA_KEY"})
+    _stub_local(
+        monkeypatch,
+        results={},
+        sources_queried=["europeana", "dpla"],
+        skipped={"europeana": "no EUROPEANA_KEY", "dpla": "no DPLA_KEY"},
+    )
     out = inst.search_institutional("q")
     assert out["ok"] is False
     assert "2 abstained" in out["error"]
@@ -350,8 +393,7 @@ def test_an_abstention_alone_is_not_a_successful_look(monkeypatch):
 
 
 def test_a_timed_out_source_is_not_a_source_that_looked(monkeypatch):
-    _stub_local(monkeypatch, results={}, sources_queried=["a", "b"],
-                timed_out=["a", "b"])
+    _stub_local(monkeypatch, results={}, sources_queried=["a", "b"], timed_out=["a", "b"])
     out = inst.search_institutional("q")
     assert out["ok"] is False and "2 timed out" in out["error"]
     assert out["timed_out"] == ["a", "b"]
@@ -360,8 +402,13 @@ def test_a_timed_out_source_is_not_a_source_that_looked(monkeypatch):
 def test_one_source_that_looked_is_enough(monkeypatch):
     """`ok` is "were we able to look", not "did we find anything". One source
     that reached an empty shelf makes the empty answer trustworthy."""
-    _stub_local(monkeypatch, results={}, sources_queried=["a", "b", "c"],
-                failed={"b": "URLError"}, skipped={"c": "no KEY"})
+    _stub_local(
+        monkeypatch,
+        results={},
+        sources_queried=["a", "b", "c"],
+        failed={"b": "URLError"},
+        skipped={"c": "no KEY"},
+    )
     out = inst.search_institutional("q")
     assert (out["ok"], out["error"]) == (True, "")
 
@@ -370,8 +417,7 @@ def test_a_typo_in_every_source_id_is_not_an_empty_library(monkeypatch):
     """An unrecognised id was logged and dropped while still being counted as
     queried, so a single typo disarmed the ratio the outage check depended on.
     Nothing dispatched is a configuration answer, not a search result."""
-    _stub_local(monkeypatch, results={}, sources_queried=[],
-                unknown=["arxvi", "crosref"])
+    _stub_local(monkeypatch, results={}, sources_queried=[], unknown=["arxvi", "crosref"])
     out = inst.search_institutional("q", sources_filter=["arxvi", "crosref"])
     assert out["ok"] is False
     assert "no source was dispatched" in out["error"]
@@ -397,8 +443,10 @@ def test_an_older_remote_is_read_conservatively(monkeypatch):
     — and name the skew, because the fix is a redeploy, not a retry."""
     monkeypatch.setenv("JELES_REMOTE_URL", "https://remote.example")
     monkeypatch.setenv("JELES_REMOTE_SECRET", SECRET)
-    _stub_remote(monkeypatch, _legacy_payload(
-        sources_queried=["a", "b"], failed={"a": "URLError", "b": "URLError"}))
+    _stub_remote(
+        monkeypatch,
+        _legacy_payload(sources_queried=["a", "b"], failed={"a": "URLError", "b": "URLError"}),
+    )
 
     out = inst.search_institutional("q")
     assert out["ok"] is False
@@ -409,9 +457,15 @@ def test_an_older_remote_that_answers_is_still_believed(monkeypatch):
     """Conservative, not paranoid: hits are hits whatever shape they arrive in."""
     monkeypatch.setenv("JELES_REMOTE_URL", "https://remote.example")
     monkeypatch.setenv("JELES_REMOTE_SECRET", SECRET)
-    _stub_remote(monkeypatch, _legacy_payload(
-        sources_queried=["a", "b"], failed={"b": "URLError"},
-        results={"a": [{"title": "t", "url": "https://a.org/1"}]}, total=1))
+    _stub_remote(
+        monkeypatch,
+        _legacy_payload(
+            sources_queried=["a", "b"],
+            failed={"b": "URLError"},
+            results={"a": [{"title": "t", "url": "https://a.org/1"}]},
+            total=1,
+        ),
+    )
 
     out = inst.search_institutional("q")
     assert (out["ok"], out["error"]) == (True, "")
@@ -435,8 +489,7 @@ def test_the_source_listing_does_not_claim_to_know_the_remote(monkeypatch):
 
 def test_the_local_lane_has_nothing_to_disclaim(monkeypatch):
     info = inst.describe_remote()
-    assert (info["lane"], info["sources_lane"], info["reason"]) == (
-        "local", "local", "")
+    assert (info["lane"], info["sources_lane"], info["reason"]) == ("local", "local", "")
 
 
 # ── The count in the prose ───────────────────────────────────────────────────
@@ -468,6 +521,7 @@ def test_the_documented_source_count_matches_the_registry():
     # tilde'd count in this range is the same mistake wearing a different
     # number, so refuse the shape rather than the instance.
     import re as _re
+
     approx = _re.findall(r"~\d{2}\b", readme)
     assert not approx, f"approximate source counts drift; say the number: {approx}"
 
@@ -496,10 +550,8 @@ def test_every_key_required_source_reports_its_abstention(monkeypatch):
     telling callers they needed a key they do not, and this test asserted the
     same wrong fact. Five sources abstain, not six.
     """
-    keyed = {sid for sid, cfg in inst.sources.SOURCES.items()
-             if cfg.get("key_required")}
-    assert keyed == {"rijksmuseum", "dpla", "smithsonian", "europeana", "bhl",
-                     "omdb"}
+    keyed = {sid for sid, cfg in inst.sources.SOURCES.items() if cfg.get("key_required")}
+    assert keyed == {"rijksmuseum", "dpla", "smithsonian", "europeana", "bhl", "omdb"}
     assert "semantic_scholar" not in keyed
     # Every source that abstains must name the variable it is waiting on,
     # otherwise `skipped` says a key is missing without saying which.
@@ -518,11 +570,16 @@ def test_every_key_required_source_reports_its_abstention(monkeypatch):
 
 def test_a_partial_outage_still_succeeds(monkeypatch):
     """One dead source must not turn a real answer into a failure."""
-    _stub_local(monkeypatch,
-                results={"loc": [{"title": "t", "url": "https://loc.gov/1",
-                                  "institution": "Library of Congress"}]},
-                sources_queried=["arxiv", "loc"],
-                failed={"arxiv": "URLError: tunnel 403"})
+    _stub_local(
+        monkeypatch,
+        results={
+            "loc": [
+                {"title": "t", "url": "https://loc.gov/1", "institution": "Library of Congress"}
+            ]
+        },
+        sources_queried=["arxiv", "loc"],
+        failed={"arxiv": "URLError: tunnel 403"},
+    )
     out = inst.search_institutional("q")
 
     assert out["ok"] is True
