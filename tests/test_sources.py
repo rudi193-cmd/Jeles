@@ -799,6 +799,29 @@ def _assert_one_bucket_each(out):
         assert sid not in out["sources_queried"], "unknown was never dispatched"
 
 
+def test_the_bucket_invariant_catches_a_planted_double_and_a_planted_orphan():
+    """Planted: the invariant helper every fan-out test below leans on must
+    itself fire — on a source in two buckets, on one in none, and on an
+    "unknown" source that was nevertheless dispatched — and stay quiet on a
+    well-formed response. A helper that had stopped asserting would turn each
+    of those tests green for nothing."""
+    good = {"sources_queried": ["a", "b"], "unknown": ["zz"], "results": {"a": []},
+            "skipped": {"b": "no key"}, "failed": {}, "timed_out": []}
+    _assert_one_bucket_each(good)
+
+    doubled = dict(good, failed={"a": "boom"})
+    with pytest.raises(AssertionError, match="want exactly one"):
+        _assert_one_bucket_each(doubled)
+
+    orphaned = dict(good, results={})
+    with pytest.raises(AssertionError, match="no bucket"):
+        _assert_one_bucket_each(orphaned)
+
+    dispatched_unknown = dict(good, unknown=["a"])
+    with pytest.raises(AssertionError, match="never dispatched"):
+        _assert_one_bucket_each(dispatched_unknown)
+
+
 def _fake_sources(monkeypatch, fns: dict):
     """Register `{sid: fn}` as the whole registry, so a test can build a
     fan-out with the exact mix of outcomes it wants."""
