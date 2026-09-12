@@ -9,6 +9,7 @@ module scope, before any test — the `no-extras` CI leg installs base `jeles`
 with no extras at all, same shape `test_corpus_server.py` handles for
 `[mcp]`).
 """
+
 from __future__ import annotations
 
 import pytest
@@ -81,8 +82,7 @@ def test_refuses_a_forged_signature_under_a_shared_key(monkeypatch):
     """A tool caller that TYPES verified_by='rita' and a made-up hex string
     is refused — the exact forgery this give-back exists to close."""
     monkeypatch.setenv("NESTOR_SEAL_KEY", "the-deployment-secret")
-    ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a.", "rita", _seal_evidence("0" * 64))
+    ok, reason = _nestor_seal.verify_human_write("q?", "a.", "rita", _seal_evidence("0" * 64))
     assert ok is False
     assert "does not verify" in reason
 
@@ -150,7 +150,8 @@ def test_a_valid_seal_does_not_verify_a_different_answer():
 
     sig = nestor_signing.sign_seal(_norm("q?"), "the real answer.", "rita")
     ok, reason = _nestor_seal.verify_human_write(
-        "q?", "a different answer entirely.", "rita", _seal_evidence(sig))
+        "q?", "a different answer entirely.", "rita", _seal_evidence(sig)
+    )
     assert ok is False
     assert "does not verify" in reason
 
@@ -161,8 +162,7 @@ def test_a_valid_seal_does_not_verify_a_different_question():
     nestor_keyring.set_keyring(kr)
 
     sig = nestor_signing.sign_seal(_norm("what colour?"), "a.", "rita")
-    ok, reason = _nestor_seal.verify_human_write(
-        "what shape?", "a.", "rita", _seal_evidence(sig))
+    ok, reason = _nestor_seal.verify_human_write("what shape?", "a.", "rita", _seal_evidence(sig))
     assert ok is False
     assert "does not verify" in reason
 
@@ -203,10 +203,10 @@ def test_a_seal_over_the_normalized_source_verifies_a_raw_question():
     answer = "White (#ffffff)."
     sig = nestor_signing.sign_seal(_norm(asked), answer, "rita")
 
-    ok, reason = _nestor_seal.verify_human_write(
-        asked, answer, "rita", _seal_evidence(sig))
-    assert (ok, reason) == (True, "ok"), \
+    ok, reason = _nestor_seal.verify_human_write(asked, answer, "rita", _seal_evidence(sig))
+    assert (ok, reason) == (True, "ok"), (
         "a seal signed the way Nestor signs must verify a question as typed"
+    )
 
 
 def test_punctuation_and_case_do_not_change_the_verdict():
@@ -217,10 +217,8 @@ def test_punctuation_and_case_do_not_change_the_verdict():
     nestor_keyring.set_keyring(kr)
 
     sig = nestor_signing.sign_seal(_norm("what colour is grove"), "White.", "rita")
-    for phrasing in ("What colour is Grove?", "what colour is grove",
-                     "What  colour   is Grove!"):
-        ok, _ = _nestor_seal.verify_human_write(
-            phrasing, "White.", "rita", _seal_evidence(sig))
+    for phrasing in ("What colour is Grove?", "what colour is grove", "What  colour   is Grove!"):
+        ok, _ = _nestor_seal.verify_human_write(phrasing, "White.", "rita", _seal_evidence(sig))
         assert ok is True, f"{phrasing!r} normalizes to the sealed source"
 
 
@@ -233,5 +231,6 @@ def test_a_different_question_still_refuses_after_normalizing():
 
     sig = nestor_signing.sign_seal(_norm("what colour is Grove?"), "White.", "rita")
     ok, reason = _nestor_seal.verify_human_write(
-        "what colour is Tokyo Night?", "White.", "rita", _seal_evidence(sig))
+        "what colour is Tokyo Night?", "White.", "rita", _seal_evidence(sig)
+    )
     assert ok is False and "does not verify" in reason

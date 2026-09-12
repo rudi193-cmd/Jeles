@@ -37,6 +37,7 @@ is correct when deciding whether to answer, and far too strict when deciding
 whether two questions are about the same thing, which is a question two people
 will always phrase with at least one word between them.
 """
+
 from __future__ import annotations
 
 import logging
@@ -164,8 +165,7 @@ def triage(
     unless A matches the representative directly. Single-link clustering would
     walk a queue of loosely-related questions into one useless blob.
     """
-    ordered = sorted(
-        gaps, key=lambda g: int(g.get("asked_count") or 0), reverse=True)
+    ordered = sorted(gaps, key=lambda g: int(g.get("asked_count") or 0), reverse=True)
     groups: list[dict[str, Any]] = []
     vetoed: list[dict[str, Any]] = []
 
@@ -177,25 +177,28 @@ def triage(
             score = similarity(group["representative"], question)
             if score < min_similarity:
                 continue
-            if judge is not None and not _same_question(
-                    group["representative"], question, judge):
-                vetoed.append({
-                    "representative": group["representative"],
-                    "question": question,
-                    "score": score,
-                })
+            if judge is not None and not _same_question(group["representative"], question, judge):
+                vetoed.append(
+                    {
+                        "representative": group["representative"],
+                        "question": question,
+                        "score": score,
+                    }
+                )
                 continue
             group["members"].append(gap)
             group["scores"].append(score)
             group["asked_total"] += int(gap.get("asked_count") or 0)
             break
         else:
-            groups.append({
-                "representative": question,
-                "members": [gap],
-                "scores": [1.0],
-                "asked_total": int(gap.get("asked_count") or 0),
-            })
+            groups.append(
+                {
+                    "representative": question,
+                    "members": [gap],
+                    "scores": [1.0],
+                    "asked_total": int(gap.get("asked_count") or 0),
+                }
+            )
 
     real = [g for g in groups if len(g["members"]) > 1]
     return {

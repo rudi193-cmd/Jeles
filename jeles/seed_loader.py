@@ -31,6 +31,7 @@ Related but different from `corpus/compose.py` in the repo, which is the
 *authoring* tool: it takes arbitrary research JSON from a pipeline. This is the
 *install* path for the batch that ships in the wheel.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -70,8 +71,7 @@ def seed_files(seed_dir: Path | None = None) -> list[Path]:
     return sorted(directory.glob("*.json"))
 
 
-def _verify(question: str, answer: str, verified_by: str,
-            seal_sig: str) -> tuple[bool, str]:
+def _verify(question: str, answer: str, verified_by: str, seal_sig: str) -> tuple[bool, str]:
     """Whether this pair's seal earns the `human` rung on THIS machine.
 
     Imported lazily so the loader works on a base install: without the
@@ -81,8 +81,11 @@ def _verify(question: str, answer: str, verified_by: str,
     from jeles import _nestor_seal
 
     return _nestor_seal.verify_human_write(
-        question, answer, verified_by,
-        {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": seal_sig})
+        question,
+        answer,
+        verified_by,
+        {"scheme": _nestor_seal.EVIDENCE_SCHEME, "seal_sig": seal_sig},
+    )
 
 
 def load_file(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
@@ -102,20 +105,34 @@ def load_file(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
     # objection as though it were an answer. Skipped, counted, and named, so
     # "not a pair set" never reads as "loaded nothing".
     if not isinstance(data, dict) or "pairs" not in data:
-        return {"domain": path.stem, "human": 0, "machine": 0, "asserted": 0,
-                "existing": 0, "errors": 0, "not_pairs": 0, "refusals": {},
-                "skipped": "not a pair set"}
+        return {
+            "domain": path.stem,
+            "human": 0,
+            "machine": 0,
+            "asserted": 0,
+            "existing": 0,
+            "errors": 0,
+            "not_pairs": 0,
+            "refusals": {},
+            "skipped": "not a pair set",
+        }
 
     domain = data.get("domain") or path.stem
     evidence_by_source: dict[str, list[str]] = {}
     for ev in data.get("evidence", []):
-        evidence_by_source.setdefault(ev.get("pair_source", ""), []).append(
-            ev.get("locator", ""))
+        evidence_by_source.setdefault(ev.get("pair_source", ""), []).append(ev.get("locator", ""))
 
-    out: dict[str, Any] = {"domain": domain, "human": 0, "asserted": 0,
-                           "machine": 0, "existing": 0, "errors": 0,
-                           "not_pairs": 0, "refusals": {},
-                           "skipped": ""}
+    out: dict[str, Any] = {
+        "domain": domain,
+        "human": 0,
+        "asserted": 0,
+        "machine": 0,
+        "existing": 0,
+        "errors": 0,
+        "not_pairs": 0,
+        "refusals": {},
+        "skipped": "",
+    }
 
     for pair in data.get("pairs", []):
         question = (pair.get("source_text") or "").strip()
@@ -144,9 +161,7 @@ def load_file(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
             out["not_pairs"] += 1
             continue
 
-        pair_sources = [
-            u for u in evidence_by_source.get(question, []) if u
-        ]
+        pair_sources = [u for u in evidence_by_source.get(question, []) if u]
 
         seal_sig = (pair.get("seal_sig") or "").strip()
         kind = "asserted"
@@ -154,8 +169,9 @@ def load_file(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
         evidence: dict[str, Any] | None = None
 
         if seal_sig:
-            claimant = (pair.get("verified_by") or data.get("verified_by")
-                        or UNSIGNED_CLAIMANT).strip()
+            claimant = (
+                pair.get("verified_by") or data.get("verified_by") or UNSIGNED_CLAIMANT
+            ).strip()
             ok, reason = _verify(question, answer, claimant, seal_sig)
             if ok:
                 kind = "human"
@@ -204,13 +220,20 @@ def load_file(path: Path, *, dry_run: bool = False) -> dict[str, Any]:
     return out
 
 
-def load_all(paths: list[Path] | None = None, *,
-             dry_run: bool = False) -> dict[str, Any]:
+def load_all(paths: list[Path] | None = None, *, dry_run: bool = False) -> dict[str, Any]:
     """Load every bundled seed file (or the ones given). Returns totals."""
     files = paths if paths is not None else seed_files()
-    totals: dict[str, Any] = {"files": len(files), "skipped": 0, "not_pairs": 0,
-                              "human": 0, "machine": 0, "asserted": 0,
-                              "existing": 0, "errors": 0, "refusals": {}}
+    totals: dict[str, Any] = {
+        "files": len(files),
+        "skipped": 0,
+        "not_pairs": 0,
+        "human": 0,
+        "machine": 0,
+        "asserted": 0,
+        "existing": 0,
+        "errors": 0,
+        "refusals": {},
+    }
     for path in files:
         r = load_file(path, dry_run=dry_run)
         if r.get("skipped"):
@@ -226,13 +249,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="jeles-seed",
         description="Load Jeles' bundled seed corpus into the store at "
-                    "$WILLOW_STORE_ROOT. Pairs carrying a Nestor seal that "
-                    "verifies on this machine land as 'verified'; everything "
-                    "else lands as an unchecked assertion.")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="report what would be written, write nothing")
-    parser.add_argument("files", nargs="*", type=Path,
-                        help="seed files to load (default: the bundled set)")
+        "$WILLOW_STORE_ROOT. Pairs carrying a Nestor seal that "
+        "verifies on this machine land as 'verified'; everything "
+        "else lands as an unchecked assertion.",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="report what would be written, write nothing"
+    )
+    parser.add_argument(
+        "files", nargs="*", type=Path, help="seed files to load (default: the bundled set)"
+    )
     args = parser.parse_args(argv)
 
     files = args.files or seed_files()
@@ -242,29 +268,37 @@ def main(argv: list[str] | None = None) -> int:
 
     totals = load_all(list(files), dry_run=args.dry_run)
     verb = "would load" if args.dry_run else "loaded"
-    print(f"{verb} {totals['files']} file(s): "
-          f"{totals['human']} verified, {totals['machine']} commons, "
-          f"{totals['asserted']} asserted, "
-          f"{totals['existing']} already present, {totals['errors']} error(s)"
-          + (f", {totals['not_pairs']} not Q/A pairs" if totals['not_pairs'] else "")
-          + (f", {totals['skipped']} file(s) not a pair set" if totals['skipped'] else ""))
+    print(
+        f"{verb} {totals['files']} file(s): "
+        f"{totals['human']} verified, {totals['machine']} commons, "
+        f"{totals['asserted']} asserted, "
+        f"{totals['existing']} already present, {totals['errors']} error(s)"
+        + (f", {totals['not_pairs']} not Q/A pairs" if totals["not_pairs"] else "")
+        + (f", {totals['skipped']} file(s) not a pair set" if totals["skipped"] else "")
+    )
 
     if totals["refusals"]:
         print("\nseals offered that did not verify here:")
         for reason, n in sorted(totals["refusals"].items(), key=lambda kv: -kv[1]):
             print(f"  {n:4}  {reason}")
-        print("\nThis is not necessarily a fault in the seed. A seal verifies "
-              "only\nwhere the signer's key is trusted; without that keyring "
-              "the pair is\nstill loaded, at the rung it can prove.")
+        print(
+            "\nThis is not necessarily a fault in the seed. A seal verifies "
+            "only\nwhere the signer's key is trusted; without that keyring "
+            "the pair is\nstill loaded, at the rung it can prove."
+        )
 
     if not args.dry_run and totals["human"] == 0 and totals["machine"] == 0 and totals["asserted"]:
-        print("\nEverything landed as 'asserted', so corpus_ask will answer "
-              "from none\nof it — asserted nuggets come back as candidates. "
-              "That is the correct\nbehaviour for claims nobody has checked.")
+        print(
+            "\nEverything landed as 'asserted', so corpus_ask will answer "
+            "from none\nof it — asserted nuggets come back as candidates. "
+            "That is the correct\nbehaviour for claims nobody has checked."
+        )
     elif not args.dry_run and totals["machine"]:
-        print("\nCommons domains (core-*) with sources landed as 'machine' — "
-              "corpus_ask serves them\nwithout a human seal. Novel domains "
-              "remain asserted until verified.")
+        print(
+            "\nCommons domains (core-*) with sources landed as 'machine' — "
+            "corpus_ask serves them\nwithout a human seal. Novel domains "
+            "remain asserted until verified."
+        )
     return 0
 
 

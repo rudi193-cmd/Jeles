@@ -110,11 +110,19 @@ def test_evidence_is_stored_and_surfaced(corpus):
     """A verification done outside jeles — the strongest form of it — must not
     be flattened to a bare 'asserted' on the way in. `evidence` carries it
     through untouched, for a reader who does hold the key to check."""
-    seal = {"mechanism": "seal_sig", "sig": "deadbeef", "chain": "nestor",
-            "signer": "a-human-who-read-it"}
+    seal = {
+        "mechanism": "seal_sig",
+        "sig": "deadbeef",
+        "chain": "nestor",
+        "signer": "a-human-who-read-it",
+    }
     rid = corpus.put_nugget(
-        "Is X true?", "Yes.", ["s"], "the operator",
-        verification_kind="asserted", evidence=seal,
+        "Is X true?",
+        "Yes.",
+        ["s"],
+        "the operator",
+        verification_kind="asserted",
+        evidence=seal,
     )["id"]
 
     nugget = corpus.get_nugget(rid)
@@ -138,8 +146,7 @@ def test_a_nugget_without_evidence_is_unchanged(corpus):
 
 
 def test_evidence_must_be_a_dict(corpus):
-    result = corpus.put_nugget("Is X true?", "Yes.", ["s"], "the operator",
-                               evidence="not-a-dict")
+    result = corpus.put_nugget("Is X true?", "Yes.", ["s"], "the operator", evidence="not-a-dict")
     assert "error" in result and "evidence" in result["error"]
 
 
@@ -169,8 +176,8 @@ def test_control_chars_stripped_at_write_boundary(corpus):
     n = corpus.get_nugget(nid["id"])
     assert "\x00" not in n["question"] and n["question"] == "What is a Vespa?"
     assert "\x07" not in n["answer"] and "\x08" not in n["verified_by"]
-    assert "\nItalian design." in n["answer"]     # newline preserved
-    assert n["sources"] == ["example.com"]         # cleaned inside the list too
+    assert "\nItalian design." in n["answer"]  # newline preserved
+    assert n["sources"] == ["example.com"]  # cleaned inside the list too
 
 
 def test_logged_gap_is_sanitized(corpus):
@@ -189,15 +196,20 @@ def test_logged_gap_is_sanitized(corpus):
 
 
 def _seed(corpus, question, answer, **kw):
-    return corpus.put_nugget(question=question, answer=answer,
-                             sources=["s"], verified_by="human", **kw)
+    return corpus.put_nugget(
+        question=question, answer=answer, sources=["s"], verified_by="human", **kw
+    )
 
 
 def test_a_different_environment_is_a_different_question(corpus):
     """The one that would page someone: staging credentials answering a
     production question. Old score 0.95, found=True."""
-    _seed(corpus, "How do I rotate the staging database password?",
-          "Run `ops rotate --env staging`.", tags=["production", "rotate"])
+    _seed(
+        corpus,
+        "How do I rotate the staging database password?",
+        "Run `ops rotate --env staging`.",
+        tags=["production", "rotate"],
+    )
 
     asked = corpus.ask_corpus("How do I rotate the production database password?")
 
@@ -210,8 +222,11 @@ def test_a_different_environment_is_a_different_question(corpus):
 
 def test_a_different_subject_is_a_different_question(corpus):
     """Old score 0.90, found=True — answered a covid question with flu advice."""
-    _seed(corpus, "Is the flu vaccine safe during pregnancy?",
-          "Yes - the inactivated flu vaccine is recommended.")
+    _seed(
+        corpus,
+        "Is the flu vaccine safe during pregnancy?",
+        "Yes - the inactivated flu vaccine is recommended.",
+    )
     assert corpus.ask_corpus("Is the covid vaccine safe during pregnancy?")["found"] is False
 
 
@@ -219,8 +234,12 @@ def test_a_tag_cannot_carry_a_wrong_nugget_over_the_threshold(corpus):
     """Old score 0.60, found=True. Half the overlap was the generic word
     'policy'; the +0.1 that pushed it over came from a tag matching the very
     word that made the questions different."""
-    _seed(corpus, "What is the privacy policy?",
-          "We keep logs for 90 days.", tags=["policy", "refund"])
+    _seed(
+        corpus,
+        "What is the privacy policy?",
+        "We keep logs for 90 days.",
+        tags=["policy", "refund"],
+    )
     assert corpus.ask_corpus("What is the refund policy?")["found"] is False
 
 
@@ -232,11 +251,14 @@ def test_a_query_far_broader_than_the_nugget_is_not_confident(corpus):
     assert corpus.ask_corpus("vaccine")["found"] is False
 
 
-@pytest.mark.parametrize("question", [
-    "What's the primary color in Grove?",          # exact
-    "primary color in Grove",                      # same tokens, no filler
-    "What is the primary color in Grove???",       # punctuation only
-])
+@pytest.mark.parametrize(
+    "question",
+    [
+        "What's the primary color in Grove?",  # exact
+        "primary color in Grove",  # same tokens, no filler
+        "What is the primary color in Grove???",  # punctuation only
+    ],
+)
 def test_the_questions_it_should_answer_still_answer(corpus, question):
     """The fix must not buy correctness with uselessness."""
     _seed_grove(corpus)
@@ -248,16 +270,21 @@ def test_a_more_general_question_still_reaches_a_specific_nugget(corpus):
     strong, so the specific nugget answers. Documented because it is a genuine
     judgement call — the corpus knows only about staging and says so in the
     answer text."""
-    _seed(corpus, "How do I rotate the staging database password?",
-          "Run `ops rotate --env staging`.")
+    _seed(
+        corpus, "How do I rotate the staging database password?", "Run `ops rotate --env staging`."
+    )
     assert corpus.ask_corpus("how do I rotate the database password?")["found"] is True
 
 
 def test_ranking_and_answering_are_separate_decisions(corpus):
     """`search_nuggets` stays a loose ranked lookup — it should still surface a
     near-miss that `ask_corpus` refuses to answer with."""
-    _seed(corpus, "What is the privacy policy?", "We keep logs for 90 days.",
-          tags=["policy", "refund"])
+    _seed(
+        corpus,
+        "What is the privacy policy?",
+        "We keep logs for 90 days.",
+        tags=["policy", "refund"],
+    )
 
     assert corpus.search_nuggets("refund policy"), "search should still find it"
     assert corpus.ask_corpus("What is the refund policy?")["found"] is False
@@ -267,8 +294,12 @@ def test_a_lower_ranked_but_confident_nugget_is_not_lost(corpus):
     """Confidence is checked across candidates, not only the top-ranked one, so
     a near-miss that ranks higher cannot hide a nugget that actually answers."""
     _seed(corpus, "What is the refund policy?", "Refunds within 30 days.")
-    _seed(corpus, "What is the privacy policy?", "We keep logs for 90 days.",
-          tags=["refund", "refund", "refund"])
+    _seed(
+        corpus,
+        "What is the privacy policy?",
+        "We keep logs for 90 days.",
+        tags=["refund", "refund", "refund"],
+    )
 
     asked = corpus.ask_corpus("What is the refund policy?")
     assert asked["found"] is True
@@ -283,8 +314,11 @@ def test_a_lower_ranked_but_confident_nugget_is_not_lost(corpus):
 
 
 def _raw(corpus, rid, column):
-    return corpus._conn(corpus.NUGGETS_COLLECTION).execute(
-        f"SELECT {column} FROM records WHERE id = ?", (rid,)).fetchone()[0]
+    return (
+        corpus._conn(corpus.NUGGETS_COLLECTION)
+        .execute(f"SELECT {column} FROM records WHERE id = ?", (rid,))
+        .fetchone()[0]
+    )
 
 
 def test_a_jeles_write_preserves_willow_mcp_columns(corpus):
@@ -293,10 +327,12 @@ def test_a_jeles_write_preserves_willow_mcp_columns(corpus):
     compatible in exactly one direction — which is not compatible."""
     rid = _seed_grove(corpus)["id"]
     corpus._conn(corpus.NUGGETS_COLLECTION).execute(
-        "UPDATE records SET deviation = 0.87, action = 'escalate' WHERE id = ?", (rid,))
+        "UPDATE records SET deviation = 0.87, action = 'escalate' WHERE id = ?", (rid,)
+    )
 
-    corpus.put_nugget("What's the primary color in Grove?", "Updated.",
-                      ["s"], "designer", nugget_id=rid)
+    corpus.put_nugget(
+        "What's the primary color in Grove?", "Updated.", ["s"], "designer", nugget_id=rid
+    )
 
     assert _raw(corpus, rid, "deviation") == 0.87
     assert _raw(corpus, rid, "action") == "escalate"
@@ -307,10 +343,12 @@ def test_a_re_put_does_not_resurrect_a_soft_deleted_record(corpus):
     could undo a delete."""
     rid = _seed_grove(corpus)["id"]
     corpus._conn(corpus.NUGGETS_COLLECTION).execute(
-        "UPDATE records SET deleted = 1 WHERE id = ?", (rid,))
+        "UPDATE records SET deleted = 1 WHERE id = ?", (rid,)
+    )
 
-    result = corpus.put_nugget("What's the primary color in Grove?", "Sneaky.",
-                               ["s"], "designer", nugget_id=rid)
+    result = corpus.put_nugget(
+        "What's the primary color in Grove?", "Sneaky.", ["s"], "designer", nugget_id=rid
+    )
 
     assert _raw(corpus, rid, "deleted") == 1, "the tombstone must survive a write"
     assert corpus.get_nugget(rid).get("error"), "and the record stays invisible"
@@ -322,8 +360,9 @@ def test_a_re_put_does_not_resurrect_a_soft_deleted_record(corpus):
 def test_created_at_survives_an_update(corpus):
     rid = _seed_grove(corpus)["id"]
     created = corpus.get_nugget(rid)["_created"]
-    corpus.put_nugget("What's the primary color in Grove?", "Updated.",
-                      ["s"], "designer", nugget_id=rid)
+    corpus.put_nugget(
+        "What's the primary color in Grove?", "Updated.", ["s"], "designer", nugget_id=rid
+    )
     assert corpus.get_nugget(rid)["_created"] == created
 
 
@@ -335,8 +374,7 @@ def test_concurrent_asks_do_not_lose_gap_counts(corpus):
     import threading
 
     question = "what is the accent color in Tokyo Night?"
-    threads = [threading.Thread(target=corpus.log_gap, args=(question,))
-               for _ in range(50)]
+    threads = [threading.Thread(target=corpus.log_gap, args=(question,)) for _ in range(50)]
     for t in threads:
         t.start()
     for t in threads:
@@ -349,8 +387,9 @@ def test_concurrent_asks_do_not_lose_gap_counts(corpus):
 def test_concurrent_asks_produce_one_gap_not_fifty(corpus):
     import threading
 
-    threads = [threading.Thread(target=corpus.log_gap, args=("one shared question",))
-               for _ in range(20)]
+    threads = [
+        threading.Thread(target=corpus.log_gap, args=("one shared question",)) for _ in range(20)
+    ]
     for t in threads:
         t.start()
     for t in threads:
@@ -364,8 +403,7 @@ def test_the_store_is_in_wal_mode(corpus):
     willow-mcp reader and a jeles writer on the shared store raise
     `database is locked` out of functions documented to return dicts."""
     _seed_grove(corpus)
-    mode = corpus._conn(corpus.NUGGETS_COLLECTION).execute(
-        "PRAGMA journal_mode").fetchone()[0]
+    mode = corpus._conn(corpus.NUGGETS_COLLECTION).execute("PRAGMA journal_mode").fetchone()[0]
     assert mode.lower() == "wal"
 
 
@@ -378,7 +416,8 @@ def test_a_failed_write_rolls_back(corpus):
     with _pytest.raises(RuntimeError), corpus._write(conn):
         conn.execute(
             "INSERT INTO records (id, data, created_at, updated_at, deleted) "
-            "VALUES ('x', '{}', 'n', 'n', 0)")
+            "VALUES ('x', '{}', 'n', 'n', 0)"
+        )
         raise RuntimeError("boom")
     assert conn.execute("SELECT COUNT(*) FROM records").fetchone()[0] == before
 
@@ -393,9 +432,14 @@ def test_a_failed_write_rolls_back(corpus):
 
 
 def test_an_asserted_nugget_does_not_read_as_verified(corpus):
-    rid = corpus.put_nugget("Is X true?", "Yes.", ["https://evil.example/p"],
-                            "the operator", verification_kind="asserted",
-                            written_by="some-mcp-client")["id"]
+    rid = corpus.put_nugget(
+        "Is X true?",
+        "Yes.",
+        ["https://evil.example/p"],
+        "the operator",
+        verification_kind="asserted",
+        written_by="some-mcp-client",
+    )["id"]
     hit = corpus.to_search_hit(corpus.get_nugget(rid))
     assert hit["confidence"] == "unverified"
     assert hit["verification_kind"] == "asserted"
@@ -409,8 +453,7 @@ def test_an_asserted_nugget_does_not_read_as_verified(corpus):
 def test_ask_corpus_does_not_answer_from_an_assertion(corpus):
     """`found: true` is the settled layer speaking. A caller that reads only
     `nugget["answer"]` — most of them — has no other way to tell."""
-    corpus.put_nugget("Is X true?", "Yes.", ["s"], "the operator",
-                      verification_kind="asserted")
+    corpus.put_nugget("Is X true?", "Yes.", ["s"], "the operator", verification_kind="asserted")
 
     asked = corpus.ask_corpus("Is X true?")
     assert asked["found"] is False
@@ -422,8 +465,7 @@ def test_ask_corpus_does_not_answer_from_an_assertion(corpus):
 
 def test_ask_corpus_still_answers_from_machine_corroboration(corpus):
     """Only the bottom rung is excluded — conflict_scan's findings still answer."""
-    corpus.put_nugget("Is Y true?", "Yes.", ["s"], "conflict_scan",
-                      verification_kind="machine")
+    corpus.put_nugget("Is Y true?", "Yes.", ["s"], "conflict_scan", verification_kind="machine")
     assert corpus.ask_corpus("Is Y true?")["found"] is True
 
 
@@ -435,9 +477,13 @@ def test_an_assertion_cannot_overwrite_a_verified_nugget(corpus):
     real = _seed_grove(corpus)
 
     refused = corpus.put_nugget(
-        "What's the primary color in Grove?", "Actually it is #000000.",
-        ["https://evil.example/p"], "designer", nugget_id=real["id"],
-        verification_kind="asserted")
+        "What's the primary color in Grove?",
+        "Actually it is #000000.",
+        ["https://evil.example/p"],
+        "designer",
+        nugget_id=real["id"],
+        verification_kind="asserted",
+    )
 
     assert refused["error"] == "kind_downgrade_refused"
     assert refused["existing_kind"] == "human" and refused["attempted_kind"] == "asserted"
@@ -448,23 +494,36 @@ def test_an_assertion_cannot_overwrite_a_verified_nugget(corpus):
 
 def test_machine_cannot_overwrite_human_either(corpus):
     real = _seed_grove(corpus)
-    refused = corpus.put_nugget("What's the primary color in Grove?", "#eeeeee.",
-                                ["s"], "conflict_scan", nugget_id=real["id"],
-                                verification_kind="machine")
+    refused = corpus.put_nugget(
+        "What's the primary color in Grove?",
+        "#eeeeee.",
+        ["s"],
+        "conflict_scan",
+        nugget_id=real["id"],
+        verification_kind="machine",
+    )
     assert refused["error"] == "kind_downgrade_refused"
 
 
 def test_a_person_can_still_supersede_and_promote(corpus):
     """The rule is one-directional: writing at the same rung or a higher one is
     ordinary editing, and must not be caught by the guard."""
-    asserted = corpus.put_nugget("Is X true?", "Maybe.", ["s"], "client",
-                                 verification_kind="asserted")
-    same = corpus.put_nugget("Is X true?", "Still maybe.", ["s"], "client",
-                             nugget_id=asserted["id"], verification_kind="asserted")
+    asserted = corpus.put_nugget(
+        "Is X true?", "Maybe.", ["s"], "client", verification_kind="asserted"
+    )
+    same = corpus.put_nugget(
+        "Is X true?",
+        "Still maybe.",
+        ["s"],
+        "client",
+        nugget_id=asserted["id"],
+        verification_kind="asserted",
+    )
     assert same["action"] == "updated"
 
-    promoted = corpus.put_nugget("Is X true?", "Yes — checked.", ["s"], "designer",
-                                 nugget_id=asserted["id"])
+    promoted = corpus.put_nugget(
+        "Is X true?", "Yes — checked.", ["s"], "designer", nugget_id=asserted["id"]
+    )
     assert promoted["verification_kind"] == "human"
     assert corpus.to_search_hit(corpus.get_nugget(asserted["id"]))["confidence"] == "verified"
 
@@ -474,8 +533,7 @@ def test_a_refused_write_changes_nothing(corpus):
     partial write — and cannot be raced past by a concurrent one."""
     real = _seed_grove(corpus)
     before = corpus.get_nugget(real["id"])["_updated"]
-    corpus.put_nugget("q?", "a", ["s"], "x", nugget_id=real["id"],
-                      verification_kind="asserted")
+    corpus.put_nugget("q?", "a", ["s"], "x", nugget_id=real["id"], verification_kind="asserted")
     assert corpus.get_nugget(real["id"])["_updated"] == before
 
 
@@ -491,12 +549,14 @@ def test_a_garbled_stored_kind_is_treated_as_the_highest_rung(corpus):
     """Reading is protective in the other direction: an unrecognised value on
     an existing record must not make it overwritable by anything."""
     rid = _seed_grove(corpus)["id"]
-    corpus._put(corpus.NUGGETS_COLLECTION,
-                {**corpus.get_nugget(rid), "verification_kind": "?"}, record_id=rid)
+    corpus._put(
+        corpus.NUGGETS_COLLECTION,
+        {**corpus.get_nugget(rid), "verification_kind": "?"},
+        record_id=rid,
+    )
 
     assert corpus.to_search_hit(corpus.get_nugget(rid))["confidence"] == "verified"
-    refused = corpus.put_nugget("q?", "a", ["s"], "x", nugget_id=rid,
-                                verification_kind="asserted")
+    refused = corpus.put_nugget("q?", "a", ["s"], "x", nugget_id=rid, verification_kind="asserted")
     assert refused["error"] == "kind_downgrade_refused"
 
 
@@ -504,13 +564,16 @@ def test_a_legacy_nugget_without_a_kind_is_human(corpus):
     """Nuggets written before the field existed were human-entered, and must not
     become overwritable by adding the field."""
     rid = _seed_grove(corpus)["id"]
-    legacy = {k: v for k, v in corpus.get_nugget(rid).items()
-              if k != "verification_kind"}
+    legacy = {k: v for k, v in corpus.get_nugget(rid).items() if k != "verification_kind"}
     corpus._put(corpus.NUGGETS_COLLECTION, legacy, record_id=rid)
 
     assert corpus.to_search_hit(corpus.get_nugget(rid))["confidence"] == "verified"
-    assert corpus.put_nugget("q?", "a", ["s"], "x", nugget_id=rid,
-                             verification_kind="machine")["error"] == "kind_downgrade_refused"
+    assert (
+        corpus.put_nugget("q?", "a", ["s"], "x", nugget_id=rid, verification_kind="machine")[
+            "error"
+        ]
+        == "kind_downgrade_refused"
+    )
 
 
 # ── A question the corpus holds must be answerable in the language it is in ──
@@ -523,14 +586,17 @@ def test_a_legacy_nugget_without_a_kind_is_human(corpus):
 # so the growth queue collected questions the corpus already answered.
 
 
-@pytest.mark.parametrize("question", [
-    "什么是主色?",                        # Chinese — unspaced, so zero ASCII tokens
-    "主色は何ですか?",                     # Japanese
-    "주요 색상은 무엇입니까?",               # Korean
-    "¿Cuál es el color primario?",      # accented Latin — "cuál" was cut at the á
-    "Is it up?",                        # every content word under three chars
-    "AI vs ML?",
-])
+@pytest.mark.parametrize(
+    "question",
+    [
+        "什么是主色?",  # Chinese — unspaced, so zero ASCII tokens
+        "主色は何ですか?",  # Japanese
+        "주요 색상은 무엇입니까?",  # Korean
+        "¿Cuál es el color primario?",  # accented Latin — "cuál" was cut at the á
+        "Is it up?",  # every content word under three chars
+        "AI vs ML?",
+    ],
+)
 def test_a_stored_question_answers_itself(corpus, question):
     """The headline failure: a nugget asked back with its own text returned
     found=False and filed a gap for a question that was already in the corpus."""
@@ -555,13 +621,20 @@ def test_cjk_is_cut_into_character_bigrams(corpus):
     assert corpus._tokens("什么是主色?") == ["什么", "么是", "是主", "主色"]
 
 
-@pytest.mark.parametrize("text, expected", [
-    ("What's the primary color in Grove?", ["primary", "color", "grove"]),
-    ("How do I rotate the staging database password?",
-     ["rotate", "staging", "database", "password"]),
-    ("Is the flu vaccine safe during pregnancy?",
-     ["flu", "vaccine", "safe", "during", "pregnancy"]),
-])
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("What's the primary color in Grove?", ["primary", "color", "grove"]),
+        (
+            "How do I rotate the staging database password?",
+            ["rotate", "staging", "database", "password"],
+        ),
+        (
+            "Is the flu vaccine safe during pregnancy?",
+            ["flu", "vaccine", "safe", "during", "pregnancy"],
+        ),
+    ],
+)
 def test_the_short_word_fallback_only_fires_when_nothing_else_matched(corpus, text, expected):
     """The three-character minimum is not lowered globally, only fallen back
     from. Lowering it would re-tokenize every nugget and shift every ranking;
@@ -575,7 +648,7 @@ def test_the_short_word_fallback_only_fires_when_nothing_else_matched(corpus, te
 
 
 def test_a_different_cjk_question_is_still_refused(corpus):
-    """"什么是强调色" (accent colour) shares its leading bigrams with
+    """ "什么是强调色" (accent colour) shares its leading bigrams with
     "什么是主色" (primary colour) and differs in the ones carrying the subject."""
     _seed(corpus, "什么是主色?", "白色。")
     assert corpus.ask_corpus("什么是强调色?")["found"] is False
@@ -590,12 +663,15 @@ def test_reaching_short_words_did_not_soften_the_english_discrimination(corpus):
     """The cases the repo already fixed, re-asserted against the new tokenizer:
     a token the nugget's question lacks is still disqualifying, and a query far
     broader than the nugget still scores under MIN_ASK_SCORE."""
-    _seed(corpus, "How do I rotate the staging database password?",
-          "Run `ops rotate --env staging`.", tags=["production", "rotate"])
+    _seed(
+        corpus,
+        "How do I rotate the staging database password?",
+        "Run `ops rotate --env staging`.",
+        tags=["production", "rotate"],
+    )
     _seed(corpus, "Is the flu vaccine safe during pregnancy?", "Yes.")
 
-    assert corpus.ask_corpus(
-        "How do I rotate the production database password?")["found"] is False
+    assert corpus.ask_corpus("How do I rotate the production database password?")["found"] is False
     assert corpus.ask_corpus("Is the covid vaccine safe during pregnancy?")["found"] is False
     assert corpus.ask_corpus("vaccine")["found"] is False
 
@@ -649,9 +725,20 @@ def test_the_variant_list_is_bounded(corpus):
     """A gap record is a queue item, not an audit log: a question asked with a
     new phrasing every time must not grow its row without limit."""
     # Every prefix is made only of stopwords, so all twelve share one gap key.
-    prefixes = ["what is", "can you show", "would you find", "did you have",
-                "how about", "which was", "please tell", "who has", "why is",
-                "when did", "where are", "should you give"]
+    prefixes = [
+        "what is",
+        "can you show",
+        "would you find",
+        "did you have",
+        "how about",
+        "which was",
+        "please tell",
+        "who has",
+        "why is",
+        "when did",
+        "where are",
+        "should you give",
+    ]
     for prefix in prefixes:
         corpus.log_gap(f"{prefix} the accent color in tokyo night?")
 
@@ -678,8 +765,7 @@ def test_the_variant_list_is_bounded(corpus):
 
 
 def test_an_outage_does_not_answer_is_it_up(corpus):
-    corpus.put_nugget("Is the API down?", "Yes - outage since 14:00.",
-                      ["s"], "designer")
+    corpus.put_nugget("Is the API down?", "Yes - outage since 14:00.", ["s"], "designer")
     asked = corpus.ask_corpus("Is the API up?")
     assert asked["found"] is False, "an outage answered 'is it up?' with 'yes'"
     assert asked["candidates"], "still a near-miss worth showing"
@@ -700,8 +786,7 @@ def test_ranking_still_uses_the_narrow_token_set(corpus):
 def test_a_two_letter_preposition_is_not_a_content_word(corpus):
     """The cost of counting short words is that 'of' vs 'in' would refuse a
     pure rephrasing. They are stopped; 'up' and 'down' are not."""
-    corpus.put_nugget("What is the primary color in Grove?", "White.",
-                      ["s"], "designer")
+    corpus.put_nugget("What is the primary color in Grove?", "White.", ["s"], "designer")
     assert corpus.ask_corpus("What is the primary color of Grove?")["found"] is True
 
 
@@ -709,10 +794,10 @@ def test_an_apostrophe_does_not_split_into_a_content_word(corpus):
     """Regression caught while fixing the above: "what's" split into "what"
     plus a bare "s", and `_ask_tokens` read that "s" as a content word the
     other phrasing lacked — so a contraction stopped matching its long form."""
-    assert corpus._ask_tokens("What's the primary color in Grove?") == \
-        corpus._ask_tokens("What is the primary color in Grove?")
-    corpus.put_nugget("What is the primary color in Grove?", "White.",
-                      ["s"], "designer")
+    assert corpus._ask_tokens("What's the primary color in Grove?") == corpus._ask_tokens(
+        "What is the primary color in Grove?"
+    )
+    corpus.put_nugget("What is the primary color in Grove?", "White.", ["s"], "designer")
     assert corpus.ask_corpus("What's the primary color in Grove?")["found"] is True
 
 
@@ -821,6 +906,7 @@ def test_a_gap_from_before_gaps_could_be_closed_counts_as_open(corpus):
 
     # Rewrite it the way the old code did.
     import json
+
     with corpus._lock:
         conn = corpus._conn(corpus.GAPS_COLLECTION)
         record = dict(gap)
@@ -828,8 +914,9 @@ def test_a_gap_from_before_gaps_could_be_closed_counts_as_open(corpus):
             record.pop(key, None)
         record["status"] = "unverified"
         with corpus._write(conn):
-            conn.execute("UPDATE records SET data = ? WHERE id = ?",
-                         (json.dumps(record), logged["id"]))
+            conn.execute(
+                "UPDATE records SET data = ? WHERE id = ?", (json.dumps(record), logged["id"])
+            )
 
     assert len(corpus.list_gaps()) == 1
     assert corpus.list_gaps()[0]["status"] == "unverified"

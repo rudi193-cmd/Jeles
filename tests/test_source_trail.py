@@ -10,6 +10,7 @@ Offline throughout: `sources.route_sources` and `sources.search` are
 monkeypatched directly, so no test here reaches `jeles._egress` or the network
 `jeles.sources` would otherwise use.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -31,6 +32,7 @@ def _stub(text):
 def _raising(exc):
     def _fn(system, history, user):
         raise exc
+
     return _fn
 
 
@@ -78,13 +80,19 @@ def test_extract_claims_swallows_llm_errors_and_returns_empty_list():
 
 def test_verify_claim_matched_false_when_nothing_comes_back(monkeypatch):
     monkeypatch.setattr(source_trail._sources, "route_sources", lambda q: ["openalex"])
-    monkeypatch.setattr(source_trail._sources, "search",
-                         lambda q, s, limit: {"results": {}})
+    monkeypatch.setattr(source_trail._sources, "search", lambda q, s, limit: {"results": {}})
     out = verify_claim("a claim nobody indexed")
     assert out == {
-        "claim": "a claim nobody indexed", "matched": False,
-        "title": "", "url": "", "date": "", "source": "", "institution": "",
-        "tier": "", "source_rank": 0.0, "overlap": 0.0,
+        "claim": "a claim nobody indexed",
+        "matched": False,
+        "title": "",
+        "url": "",
+        "date": "",
+        "source": "",
+        "institution": "",
+        "tier": "",
+        "source_rank": 0.0,
+        "overlap": 0.0,
         "relevance": "unjudged",
     }
 
@@ -96,12 +104,24 @@ def test_verify_claim_picks_the_highest_ranked_hit_not_the_first(monkeypatch):
     monkeypatch.setattr(source_trail._sources, "route_sources", lambda q: ["zenodo", "pubmed"])
 
     def _fake_search(query, s, limit):
-        return {"results": {
-            "zenodo": [{"title": "A preprint", "url": "https://zenodo.org/x",
-                        "institution": "Zenodo / CERN"}],
-            "pubmed": [{"title": "A peer-reviewed paper", "url": "https://pubmed/y",
-                        "institution": "PubMed / NLM"}],
-        }}
+        return {
+            "results": {
+                "zenodo": [
+                    {
+                        "title": "A preprint",
+                        "url": "https://zenodo.org/x",
+                        "institution": "Zenodo / CERN",
+                    }
+                ],
+                "pubmed": [
+                    {
+                        "title": "A peer-reviewed paper",
+                        "url": "https://pubmed/y",
+                        "institution": "PubMed / NLM",
+                    }
+                ],
+            }
+        }
 
     monkeypatch.setattr(source_trail._sources, "search", _fake_search)
     out = verify_claim("some claim")
@@ -114,11 +134,19 @@ def test_verify_claim_picks_the_highest_ranked_hit_not_the_first(monkeypatch):
 def test_verify_claim_tags_a_press_source_as_press_not_academic(monkeypatch):
     monkeypatch.setattr(source_trail._sources, "route_sources", lambda q: ["psychiatric_times"])
     monkeypatch.setattr(
-        source_trail._sources, "search",
-        lambda q, s, limit: {"results": {
-            "psychiatric_times": [{"title": "An article", "url": "https://pt/x",
-                                    "institution": "Psychiatric Times"}],
-        }},
+        source_trail._sources,
+        "search",
+        lambda q, s, limit: {
+            "results": {
+                "psychiatric_times": [
+                    {
+                        "title": "An article",
+                        "url": "https://pt/x",
+                        "institution": "Psychiatric Times",
+                    }
+                ],
+            }
+        },
     )
     out = verify_claim("a psychiatry claim")
     assert out["tier"] == "press"
@@ -127,10 +155,10 @@ def test_verify_claim_tags_a_press_source_as_press_not_academic(monkeypatch):
 
 def test_verify_claim_auto_routes_when_no_sources_given(monkeypatch):
     calls = []
-    monkeypatch.setattr(source_trail._sources, "route_sources",
-                         lambda q: calls.append(q) or ["arxiv"])
-    monkeypatch.setattr(source_trail._sources, "search",
-                         lambda q, s, limit: {"results": {}})
+    monkeypatch.setattr(
+        source_trail._sources, "route_sources", lambda q: calls.append(q) or ["arxiv"]
+    )
+    monkeypatch.setattr(source_trail._sources, "search", lambda q, s, limit: {"results": {}})
     verify_claim("route me")
     assert calls == ["route me"]
 
@@ -138,10 +166,12 @@ def test_verify_claim_auto_routes_when_no_sources_given(monkeypatch):
 def test_verify_claim_skips_routing_when_sources_are_given_explicitly(monkeypatch):
     routed = []
     searched = []
-    monkeypatch.setattr(source_trail._sources, "route_sources",
-                         lambda q: routed.append(q) or ["should-not-be-used"])
-    monkeypatch.setattr(source_trail._sources, "search",
-                         lambda q, s, limit: searched.append(s) or {"results": {}})
+    monkeypatch.setattr(
+        source_trail._sources, "route_sources", lambda q: routed.append(q) or ["should-not-be-used"]
+    )
+    monkeypatch.setattr(
+        source_trail._sources, "search", lambda q, s, limit: searched.append(s) or {"results": {}}
+    )
     verify_claim("a claim", sources=["pubmed", "arxiv"])
     assert routed == []
     assert searched == [["pubmed", "arxiv"]]
@@ -150,10 +180,13 @@ def test_verify_claim_skips_routing_when_sources_are_given_explicitly(monkeypatc
 def test_verify_claim_falls_back_to_070_rank_for_an_unranked_source(monkeypatch):
     monkeypatch.setattr(source_trail._sources, "route_sources", lambda q: ["mystery_source"])
     monkeypatch.setattr(
-        source_trail._sources, "search",
-        lambda q, s, limit: {"results": {
-            "mystery_source": [{"title": "t", "url": "u", "institution": "i"}],
-        }},
+        source_trail._sources,
+        "search",
+        lambda q, s, limit: {
+            "results": {
+                "mystery_source": [{"title": "t", "url": "u", "institution": "i"}],
+            }
+        },
     )
     out = verify_claim("obscure claim")
     assert out["source_rank"] == pytest.approx(0.70)
@@ -177,8 +210,7 @@ def test_verify_claim_passes_limit_through_to_search(monkeypatch):
 
 def test_verify_text_short_circuits_when_no_claims_are_found():
     out = verify_text("no verifiable content here", _stub(""))
-    assert out == {"claims": [], "total": 0, "matched": 0,
-                    "note": "No verifiable claims found."}
+    assert out == {"claims": [], "total": 0, "matched": 0, "note": "No verifiable claims found."}
 
 
 def test_verify_text_verifies_each_extracted_claim_and_counts_matches(monkeypatch):
@@ -200,10 +232,16 @@ def test_verify_text_verifies_each_extracted_claim_and_counts_matches(monkeypatc
 
 def test_verify_text_forwards_sources_and_limit_to_verify_claim(monkeypatch):
     seen = []
-    monkeypatch.setattr(source_trail._sources, "route_sources",
-                         lambda q: (_ for _ in ()).throw(AssertionError("should not route")))
-    monkeypatch.setattr(source_trail._sources, "search",
-                         lambda q, s, limit: seen.append((s, limit)) or {"results": {}})
+    monkeypatch.setattr(
+        source_trail._sources,
+        "route_sources",
+        lambda q: (_ for _ in ()).throw(AssertionError("should not route")),
+    )
+    monkeypatch.setattr(
+        source_trail._sources,
+        "search",
+        lambda q, s, limit: seen.append((s, limit)) or {"results": {}},
+    )
     verify_text("irrelevant", _stub("only claim"), sources=["arxiv"], limit=7)
     assert seen == [(["arxiv"], 7)]
 
@@ -260,7 +298,10 @@ def test_importing_source_trail_pulls_in_no_third_party_or_mcp_modules():
 
 def test_source_trail_declares_the_documented_public_api():
     assert source_trail.__all__ == [
-        "PRESS_SOURCES", "extract_claims", "verify_claim", "verify_text",
+        "PRESS_SOURCES",
+        "extract_claims",
+        "verify_claim",
+        "verify_text",
     ]
 
 
@@ -276,40 +317,71 @@ def test_source_trail_declares_the_documented_public_api():
 
 
 def _hit(title, snippet=""):
-    return {"title": title, "url": "https://e.org/1", "date": "2026",
-            "institution": "Elsevier BV", "snippet": snippet}
+    return {
+        "title": title,
+        "url": "https://e.org/1",
+        "date": "2026",
+        "institution": "Elsevier BV",
+        "snippet": snippet,
+    }
 
 
 def test_a_document_that_shares_only_vocabulary_scores_low(monkeypatch):
     """The measured false positive. The paper is genuinely about function
     calling; the claim is about Gemma 4. The tokens that make the claim
     specific are exactly the ones missing."""
-    monkeypatch.setattr(_st._sources, "search", lambda c, s, limit: {"results": {
-        "crossref": [_hit("Code-Generated Tool Orchestration versus "
-                          "Native Function Calling")]}})
-    out = verify_claim("Gemma 4 ships with native function calling trained "
-                       "into the model")
+    monkeypatch.setattr(
+        _st._sources,
+        "search",
+        lambda c, s, limit: {
+            "results": {
+                "crossref": [
+                    _hit("Code-Generated Tool Orchestration versus Native Function Calling")
+                ]
+            }
+        },
+    )
+    out = verify_claim("Gemma 4 ships with native function calling trained into the model")
     assert out["matched"] is True, "matched still means only that a search returned"
     assert out["overlap"] < 0.5, "but the overlap says the document is not about it"
 
 
 def test_a_document_that_names_the_claim_scores_higher(monkeypatch):
-    monkeypatch.setattr(_st._sources, "search", lambda c, s, limit: {"results": {
-        "crossref": [_hit("Attention is All You Need: the Transformer "
-                          "architecture introduced")]}})
-    out = verify_claim("The Transformer architecture was introduced in the "
-                       "paper Attention Is All You Need")
+    monkeypatch.setattr(
+        _st._sources,
+        "search",
+        lambda c, s, limit: {
+            "results": {
+                "crossref": [
+                    _hit("Attention is All You Need: the Transformer architecture introduced")
+                ]
+            }
+        },
+    )
+    out = verify_claim(
+        "The Transformer architecture was introduced in the paper Attention Is All You Need"
+    )
     assert out["overlap"] > 0.5
 
 
 def test_source_rank_is_about_the_publisher_not_the_match(monkeypatch):
     """Two claims, same journal, wildly different relevance — identical rank.
     That is the whole reason the field could not keep the name `confidence`."""
-    monkeypatch.setattr(_st._sources, "search", lambda c, s, limit: {"results": {
-        "crossref": [_hit("Commentary: do you have any doctors in your family?")]}})
+    monkeypatch.setattr(
+        _st._sources,
+        "search",
+        lambda c, s, limit: {
+            "results": {"crossref": [_hit("Commentary: do you have any doctors in your family?")]}
+        },
+    )
     a = verify_claim("Qwen 3 models have the most stable tool calling")
-    monkeypatch.setattr(_st._sources, "search", lambda c, s, limit: {"results": {
-        "crossref": [_hit("Qwen 3 models have the most stable tool calling")]}})
+    monkeypatch.setattr(
+        _st._sources,
+        "search",
+        lambda c, s, limit: {
+            "results": {"crossref": [_hit("Qwen 3 models have the most stable tool calling")]}
+        },
+    )
     b = verify_claim("Qwen 3 models have the most stable tool calling")
     assert a["source_rank"] == b["source_rank"], "rank cannot tell them apart"
     assert a["overlap"] < b["overlap"], "overlap can"
@@ -344,21 +416,34 @@ def _judge(verdict):
 
 
 def _returns(monkeypatch, title):
-    monkeypatch.setattr(_st._sources, "search", lambda c, s, limit: {"results": {
-        "crossref": [{"title": title, "url": "https://e.org/1", "date": "2026",
-                      "institution": "Elsevier BV", "snippet": ""}]}})
+    monkeypatch.setattr(
+        _st._sources,
+        "search",
+        lambda c, s, limit: {
+            "results": {
+                "crossref": [
+                    {
+                        "title": title,
+                        "url": "https://e.org/1",
+                        "date": "2026",
+                        "institution": "Elsevier BV",
+                        "snippet": "",
+                    }
+                ]
+            }
+        },
+    )
 
 
 def test_the_judge_demotes_a_document_that_only_shares_vocabulary(monkeypatch):
-    _returns(monkeypatch, "Code-Generated Tool Orchestration versus Native "
-                          "Function Calling")
-    out = verify_claim("Gemma 4 ships with native function calling",
-                       judge=_judge("UNRELATED"))
+    _returns(monkeypatch, "Code-Generated Tool Orchestration versus Native Function Calling")
+    out = verify_claim("Gemma 4 ships with native function calling", judge=_judge("UNRELATED"))
     assert out["relevance"] == "unrelated"
     assert out["matched"] is False, "an unrelated document does not back a claim"
     assert out["title"], "what was found and rejected stays visible"
-    assert out["source_rank"] == pytest.approx(0.90), \
+    assert out["source_rank"] == pytest.approx(0.90), (
         "the publisher's rank is unchanged - it was never the thing at issue"
+    )
 
 
 def test_the_judge_cannot_promote_a_claim_nothing_returned(monkeypatch):
@@ -373,8 +458,9 @@ def test_the_judge_cannot_promote_a_claim_nothing_returned(monkeypatch):
 
 def test_a_supporting_verdict_leaves_the_match_alone(monkeypatch):
     _returns(monkeypatch, "Attention is All You Need")
-    out = verify_claim("The Transformer was introduced in Attention Is All You Need",
-                       judge=_judge("SUPPORTS"))
+    out = verify_claim(
+        "The Transformer was introduced in Attention Is All You Need", judge=_judge("SUPPORTS")
+    )
     assert out["relevance"] == "supports" and out["matched"] is True
 
 
@@ -388,6 +474,7 @@ def test_no_judge_means_no_model_and_no_change(monkeypatch):
 
 def test_a_broken_judge_changes_nothing(monkeypatch):
     """A model outage must not quietly become a policy that rejects everything."""
+
     def explode(system, history, text):
         raise RuntimeError("ollama is down")
 

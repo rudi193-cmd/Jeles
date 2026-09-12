@@ -1,5 +1,15 @@
 name: Tests
 
+# The fleet CI floor (fleet plan decision 5, Wave 4): a Linux matrix derived
+# from pyproject.toml's classifiers, a Windows leg at the floor and ceiling,
+# ruff pinned to an exact release with `format --check` beside `check`, and
+# an aggregate `test` gate that fails on anything but success. CodeQL for
+# python and actions runs from GitHub's default setup on this repository (the
+# `Analyze (python)` / `Analyze (actions)` checks on every PR), not from a
+# workflow file here — a second, workflow-based configuration would be
+# refused while default setup is enabled. tests/test_ci_floor.py holds this
+# file to the shape below.
+
 on:
   push:
     # Both names: the fleet is split between `main` and `master`, and a
@@ -20,6 +30,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The matrix is READ, not typed. This job runs tools/python_versions.py,
+  # which lists every `Programming Language :: Python :: 3.N` classifier in
+  # pyproject.toml — the versions PyPI advertises — and the test jobs below
+  # take their matrix from its outputs. The previous matrix was hand-typed and
+  # had drifted: the classifiers advertised 3.10-3.13 while CI ran 3.10 and
+  # 3.12, so two advertised versions had never been executed here.
+  python-versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.derive.outputs.matrix }}
+      edges: ${{ steps.derive.outputs.edges }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Derive the matrix from the classifiers
+        id: derive
+        run: python tools/python_versions.py --github-output
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -32,8 +65,11 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      # Pinned to an exact release: an unpinned ruff turns every upstream
+      # rule change into a red PR that touched nothing. Bump deliberately, in
+      # its own commit, with the tree re-checked under the new version.
       - name: Install lint tools
-        run: pip install ruff==0.15.0 bandit
+        run: pip install ruff==0.16.7 bandit
 
       # Rules and line length come from [tool.ruff] in pyproject.toml. Until
       # that section existed this ran ruff's defaults — E4/E7/E9 + F — so there
@@ -42,28 +78,28 @@ jobs:
       - name: Ruff (enforced)
         run: ruff check jeles tests
 
+      # The tree was hand-styled until the floor arrived; it was reformatted
+      # mechanically in its own commit rather than by loosening the config.
+      # tools/ is outside both checks on purpose: tools/changelog_dedup.py is
+      # vendored and hash-pinned (tests/test_vendor_pins.py).
+      - name: Ruff format (enforced)
+        run: ruff format --check jeles tests
+
       - name: Bandit (enforced — tree is clean, keep it that way)
         run: bandit -r jeles -ll -q
 
   test-matrix:
+    needs: python-versions
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        # Derived from pyproject.toml's classifiers, not chosen. Jeles
-        # advertises 3.10, 3.11, 3.12 and 3.13 on PyPI; CI ran 3.10 and 3.12,
-        # so two of the four advertised versions had never been executed here.
-        # An installer reading the classifiers was being told something no
-        # test had checked.
-        #
-        # Pull requests run floor and ceiling; push, schedule and dispatch run
-        # the full declared range. That split is only safe because the required
-        # check is the aggregate `test` job below, never a matrix cell — so the
-        # set of cells may differ per event without the gate going quiet.
-        python-version: ${{ fromJSON(github.event_name == 'pull_request'
-          && '["3.10","3.13"]'
-          || '["3.10","3.11","3.12","3.13"]') }}
+        # Every classifier-declared minor, on every event. The earlier
+        # floor-and-ceiling-on-PRs split is gone: the floor says every listed
+        # version, and the required check is the aggregate `test` job below,
+        # never a matrix cell, so the cell set can be the full set everywhere.
+        python-version: ${{ fromJSON(needs.python-versions.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v7
@@ -99,6 +135,35 @@ jobs:
           # Reported for visibility, never gating.
           echo "--- jeles/sources.py (informational) ---"
           coverage report --include='jeles/sources.py'
+
+  # The floor and ceiling Pythons on Windows. Not the full matrix: the
+  # platform lessons (path separators, default encodings, line endings) show
+  # up on any version, and the version-specific ones are Linux's to find.
+  windows:
+    needs: python-versions
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(needs.python-versions.outputs.edges) }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install package
+        run: pip install -e ".[dev,mcp]"
+
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
   # Base `jeles` must install and pass with NO extras — that is the promise that
   # lets willow-mcp depend on this package without inheriting a version
@@ -139,7 +204,7 @@ jobs:
         run: python -m pytest tests/ -q
 
   # Aggregate gate: branch protection requires a single check named "test"
-  # across the whole fleet. Green only when lint and every matrix leg are.
+  # across the whole fleet. Green only when every leg above is.
   #
   # `if: always()` is load-bearing, not boilerplate. Without it, a failing
   # dependency does not fail this job — it *skips* it, because that is what
@@ -150,23 +215,25 @@ jobs:
   #
   # Same shape as the bugs this repo keeps finding: absence of a failure being
   # mistaken for evidence of success. So the result is asserted explicitly
-  # rather than inferred from this job having run at all.
+  # rather than inferred from this job having run at all: 'skipped' and
+  # 'cancelled' are failures here too — a leg that did not run has not told us
+  # anything, and this gate speaks for all of them.
   test:
-    needs: [test-matrix, lint, no-extras]
+    needs: [python-versions, lint, test-matrix, windows, no-extras]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Assert every dependency actually succeeded
-        # 'skipped' and 'cancelled' are failures here too: a leg that did not
-        # run has not told us anything, and this gate speaks for all of them.
         if: ${{ contains(needs.*.result, 'failure')
                 || contains(needs.*.result, 'cancelled')
                 || contains(needs.*.result, 'skipped') }}
         run: |
+          echo "python-versions=${{ needs.python-versions.result }}"
           echo "lint=${{ needs.lint.result }}"
           echo "test-matrix=${{ needs.test-matrix.result }}"
+          echo "windows=${{ needs.windows.result }}"
           echo "no-extras=${{ needs.no-extras.result }}"
           echo "::error::a required job did not succeed — see the results above"
           exit 1
 
-      - run: echo "lint, all matrix legs, and the no-extras install are green"
+      - run: echo "lint, every Linux matrix leg, both Windows legs, and the no-extras install are green"

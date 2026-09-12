@@ -46,8 +46,10 @@ _COLLECTION_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 def _validate_collection(collection: str) -> None:
     if not _COLLECTION_RE.match(collection or ""):
-        raise ValueError(f"invalid collection name (must match "
-                         f"{_COLLECTION_RE.pattern}): {collection!r}")
+        raise ValueError(
+            f"invalid collection name (must match {_COLLECTION_RE.pattern}): {collection!r}"
+        )
+
 
 # The `deviation`/`action` columns are willow-mcp's (SOIL Store, db.py). jeles
 # never reads them, but a jeles-created collection missing them makes a
@@ -77,6 +79,7 @@ def _migrate_records(conn: sqlite3.Connection) -> None:
     if "action" not in have:
         conn.execute("ALTER TABLE records ADD COLUMN action TEXT NOT NULL DEFAULT 'work_quiet'")
 
+
 _lock = threading.RLock()
 _conns: dict[str, sqlite3.Connection] = {}
 
@@ -98,8 +101,7 @@ def _conn(collection: str) -> sqlite3.Connection:
             # a read-modify-write is only as atomic as the in-process lock —
             # which is nothing at all to a second process, and this store is
             # explicitly designed to be shared with willow-mcp.
-            conn = sqlite3.connect(str(db_path), check_same_thread=False,
-                                   isolation_level=None)
+            conn = sqlite3.connect(str(db_path), check_same_thread=False, isolation_level=None)
             # WAL lets readers run while a writer holds the database, and
             # busy_timeout makes a contended write wait rather than raising
             # `database is locked` out of put_nugget/ask_corpus — which no
@@ -146,7 +148,7 @@ def _clean(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {k: _clean(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [_clean(v) for v in obj]      # tuples json-serialize as lists anyway
+        return [_clean(v) for v in obj]  # tuples json-serialize as lists anyway
     return obj
 
 
@@ -174,7 +176,7 @@ def _put(
     """
     rid = record_id or uuid.uuid4().hex[:8]
     now = _now()
-    record = _clean(record)   # one chokepoint — covers nuggets and gaps alike
+    record = _clean(record)  # one chokepoint — covers nuggets and gaps alike
     with _lock:
         conn = _conn(collection)
         with _write(conn):
@@ -182,8 +184,7 @@ def _put(
                 row = conn.execute(
                     "SELECT data, deleted FROM records WHERE id = ?", (rid,)
                 ).fetchone()
-                refusal = guard(json.loads(row[0]) if row else None,
-                                bool(row and row[1]))
+                refusal = guard(json.loads(row[0]) if row else None, bool(row and row[1]))
                 if refusal is not None:
                     raise _WriteRefused(refusal)
             # `INSERT OR REPLACE` deletes the row and inserts a new one, so every
@@ -206,10 +207,14 @@ def _put(
 
 def _get(collection: str, record_id: str) -> dict[str, Any] | None:
     with _lock:
-        row = _conn(collection).execute(
-            "SELECT data, created_at, updated_at FROM records WHERE id = ? AND deleted = 0",
-            (record_id,),
-        ).fetchone()
+        row = (
+            _conn(collection)
+            .execute(
+                "SELECT data, created_at, updated_at FROM records WHERE id = ? AND deleted = 0",
+                (record_id,),
+            )
+            .fetchone()
+        )
     if not row:
         return None
     record = json.loads(row[0])
@@ -221,10 +226,14 @@ def _get(collection: str, record_id: str) -> dict[str, Any] | None:
 
 def _all(collection: str) -> list[dict[str, Any]]:
     with _lock:
-        rows = _conn(collection).execute(
-            "SELECT id, data, created_at, updated_at FROM records "
-            "WHERE deleted = 0 ORDER BY updated_at DESC"
-        ).fetchall()
+        rows = (
+            _conn(collection)
+            .execute(
+                "SELECT id, data, created_at, updated_at FROM records "
+                "WHERE deleted = 0 ORDER BY updated_at DESC"
+            )
+            .fetchall()
+        )
     out = []
     for rid, data, created, updated in rows:
         record = json.loads(data)
@@ -236,11 +245,49 @@ def _all(collection: str) -> list[dict[str, Any]]:
 
 
 _STOP = {
-    "the", "and", "for", "with", "from", "that", "this", "these", "those",
-    "have", "has", "had", "was", "were", "are", "is", "been", "being",
-    "what", "who", "when", "where", "why", "how", "which", "would", "could",
-    "should", "does", "did", "about", "into", "your", "you", "tell", "show",
-    "find", "give", "please", "can", "will", "its", "it's",
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "that",
+    "this",
+    "these",
+    "those",
+    "have",
+    "has",
+    "had",
+    "was",
+    "were",
+    "are",
+    "is",
+    "been",
+    "being",
+    "what",
+    "who",
+    "when",
+    "where",
+    "why",
+    "how",
+    "which",
+    "would",
+    "could",
+    "should",
+    "does",
+    "did",
+    "about",
+    "into",
+    "your",
+    "you",
+    "tell",
+    "show",
+    "find",
+    "give",
+    "please",
+    "can",
+    "will",
+    "its",
+    "it's",
     # Short function words. Only `_confidence` and `log_gap`'s short-code
     # segment ever see words this brief — `_WORD_RE` needs three characters —
     # so listing them here costs nothing elsewhere. They are here so that
@@ -249,8 +296,25 @@ _STOP = {
     # separation either all short words are noise or none of them are.
     # Deliberately no single letters: "drug A" vs "drug B" is exactly the case
     # log_gap's short-code segment exists to keep apart (test_hardening.py).
-    "an", "as", "at", "be", "by", "do", "he", "if", "in", "it",
-    "me", "my", "of", "on", "or", "so", "to", "us", "we",
+    "an",
+    "as",
+    "at",
+    "be",
+    "by",
+    "do",
+    "he",
+    "if",
+    "in",
+    "it",
+    "me",
+    "my",
+    "of",
+    "on",
+    "or",
+    "so",
+    "to",
+    "us",
+    "we",
 }
 
 
@@ -288,11 +352,11 @@ _STOP = {
 #    (tests/test_hardening.py). Conditional means the fallback only ever adds
 #    tokens where there were none, and never reweights an existing question.
 _CJK_RE = re.compile(
-    "[\u3040-\u30ff"    # hiragana + katakana
-    "\u3400-\u4dbf"     # CJK unified ideographs extension A
-    "\u4e00-\u9fff"     # CJK unified ideographs
-    "\uf900-\ufaff"     # CJK compatibility ideographs
-    "\uac00-\ud7af]+"   # hangul syllables
+    "[\u3040-\u30ff"  # hiragana + katakana
+    "\u3400-\u4dbf"  # CJK unified ideographs extension A
+    "\u4e00-\u9fff"  # CJK unified ideographs
+    "\uf900-\ufaff"  # CJK compatibility ideographs
+    "\uac00-\ud7af]+"  # hangul syllables
 )
 _WORD_RE = re.compile(r"[^\W_][\w-]{2,}")
 # The apostrophe binds: "what's" is one token, not "what" plus a bare "s".
@@ -310,11 +374,11 @@ def _tokens(text: str) -> list[str]:
     raw: list[str] = []
     pos = 0
     for match in _CJK_RE.finditer(lowered):
-        raw.extend(_WORD_RE.findall(lowered[pos:match.start()]))
+        raw.extend(_WORD_RE.findall(lowered[pos : match.start()]))
         run = match.group(0)
         # range(max(1, n-1)) so a one-character run yields that character
         # rather than nothing.
-        raw.extend(run[i:i + 2] for i in range(max(1, len(run) - 1)))
+        raw.extend(run[i : i + 2] for i in range(max(1, len(run) - 1)))
         pos = match.end()
     raw.extend(_WORD_RE.findall(lowered[pos:]))
     tokens = [t for t in raw if t not in _STOP]
@@ -348,8 +412,11 @@ def _ask_tokens(text: str) -> list[str]:
     """
     tokens = _tokens(text)
     seen = set(tokens)
-    short = [t for t in _SHORT_RE.findall((text or "").lower())
-             if len(t) < 3 and t not in _STOP and t not in seen]
+    short = [
+        t
+        for t in _SHORT_RE.findall((text or "").lower())
+        if len(t) < 3 and t not in _STOP and t not in seen
+    ]
     return tokens + short
 
 
@@ -448,8 +515,10 @@ def put_nugget(
         return {"error": "question, answer, and verified_by are required"}
     kind = str(verification_kind or "").lower()
     if kind not in _KIND_RANK:
-        return {"error": f"verification_kind must be one of "
-                         f"{', '.join(sorted(_KIND_RANK))} (got {verification_kind!r})"}
+        return {
+            "error": f"verification_kind must be one of "
+            f"{', '.join(sorted(_KIND_RANK))} (got {verification_kind!r})"
+        }
     if evidence is not None and not isinstance(evidence, dict):
         return {"error": f"evidence must be a dict (got {type(evidence).__name__})"}
     record = {
@@ -490,8 +559,9 @@ def put_nugget(
         # reader will ever return. The write is not refused — refusing would let
         # anyone who can soft-delete a record permanently deny the id — but it
         # says so.
-        outcome["action"] = ("updated_tombstoned" if tombstoned
-                             else "updated" if existing is not None else "created")
+        outcome["action"] = (
+            "updated_tombstoned" if tombstoned else "updated" if existing is not None else "created"
+        )
         return None
 
     try:
@@ -637,9 +707,9 @@ def ask_corpus(question: str, include_asserted: bool = False) -> dict[str, Any]:
     # the candidates rather than only the top-ranked one, so a nugget that
     # genuinely answers the question is not lost to a higher-ranked near-miss.
     confident = [
-        (n, c) for n, c in ((n, _confidence(n, ask_tokens)) for n, _ in ranked)
-        if c >= MIN_ASK_SCORE
-        and (include_asserted or _kind_of(n) != "asserted")
+        (n, c)
+        for n, c in ((n, _confidence(n, ask_tokens)) for n, _ in ranked)
+        if c >= MIN_ASK_SCORE and (include_asserted or _kind_of(n) != "asserted")
     ]
     if not confident:
         log_gap(question)
@@ -664,8 +734,7 @@ def to_search_hit(nugget: dict[str, Any], idx: int = 0) -> dict[str, Any]:
     # kind, and downgrade its confidence label so the two are distinguishable on
     # read (absent kind => legacy human nugget).
     kind = _kind_of(nugget)
-    confidence = {"human": "verified", "machine": "corroborated",
-                  "asserted": "unverified"}[kind]
+    confidence = {"human": "verified", "machine": "corroborated", "asserted": "unverified"}[kind]
     # `source` is the line a reader actually sees, so it cannot say "Verified
     # corpus" over an assertion nobody checked — and it shows `written_by`, the
     # app that made the write, rather than `verified_by`, which is only ever
@@ -757,10 +826,9 @@ def _gap_key(question: str) -> str:
     tokens = _tokens(question)
     unique = sorted(set(tokens))
     pairs = sorted({f"{a}>{b}" for a, b in pairwise(tokens)})
-    short = sorted({
-        t for t in _SHORT_RE.findall(question.lower())
-        if len(t) < 3 and t not in _STOP
-    })
+    short = sorted(
+        {t for t in _SHORT_RE.findall(question.lower()) if len(t) < 3 and t not in _STOP}
+    )
     if not (unique or short):
         # Nothing tokenized at all (punctuation, emoji): fall back to the text.
         return question.lower()

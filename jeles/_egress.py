@@ -20,6 +20,7 @@ the handler set, the body cap — is identical by construction.
 this package promises nothing happens at load. `jeles.corpus` must never import
 this (see `tests/test_import_purity.py`); nothing here is needed for storage.
 """
+
 from __future__ import annotations
 
 import ipaddress
@@ -48,8 +49,7 @@ def scheme_ok(url: str, allowed: Iterable[str]) -> bool:
 
 
 #: Hostnames that name the local machine without being IP literals.
-_LOCAL_NAMES = frozenset({"localhost", "localhost.", "localhost.localdomain",
-                          "ip6-localhost"})
+_LOCAL_NAMES = frozenset({"localhost", "localhost.", "localhost.localdomain", "ip6-localhost"})
 
 
 def _without_port(host: str) -> str:
@@ -125,6 +125,22 @@ def _dialled_hosts(url: str) -> list[str] | None:
             continue
         parsed = True
     return seen if parsed else None
+
+
+def loggable(url: str) -> str:
+    """The part of a URL that may be written to a log or an error message:
+    scheme, host and path, with userinfo, query and fragment dropped.
+
+    Sources carry their API keys in the query string (`&api_key=`, `?wskey=`),
+    and the failure paths used to quote a prefix of the URL — `url[:80]` in
+    `sources._get`, `url[:60]` in this module's refusals. For Europeana the key
+    begins at offset 53, so a prefix is not a redaction. Dropped rather than
+    masked: the host and path already say which source failed, and a masked
+    query would only invite someone to widen the window again.
+    """
+    parts = urllib.parse.urlsplit(url)
+    host = parts.netloc.rpartition("@")[2]
+    return urllib.parse.urlunsplit((parts.scheme, host, parts.path, "", ""))
 
 
 def _split_host(url: str) -> str | None:
@@ -243,9 +259,15 @@ def private_destination(url: str) -> str | None:
                 addr = ipaddress.ip_address(raw)
             except ValueError:
                 continue
-            if (addr.is_private or addr.is_loopback or addr.is_link_local
-                    or addr.is_reserved or addr.is_multicast
-                    or addr.is_unspecified or not addr.is_global):
+            if (
+                addr.is_private
+                or addr.is_loopback
+                or addr.is_link_local
+                or addr.is_reserved
+                or addr.is_multicast
+                or addr.is_unspecified
+                or not addr.is_global
+            ):
                 via = "" if raw == host else f" ({how} {host!r})"
                 return f"{raw} is not a public address{via}"
     return None
@@ -273,30 +295,40 @@ class SchemeGuardedRedirects(urllib.request.HTTPRedirectHandler):
         # Location arrives here absolute and carries its scheme.
         if not scheme_ok(newurl, self.allowed):
             raise urllib.error.HTTPError(
-                newurl, code,
-                f"refusing redirect to a scheme outside "
-                f"{sorted(self.allowed)}: {newurl[:60]!r}",
-                headers, fp)
+                newurl,
+                code,
+                f"refusing redirect to a scheme outside {sorted(self.allowed)}: "
+                f"{loggable(newurl)!r}",
+                headers,
+                fp,
+            )
         if not self.allow_private:
             reason = private_destination(newurl)
             if reason is not None:
                 raise urllib.error.HTTPError(
-                    newurl, code,
-                    f"refusing redirect to a private destination — {reason}: "
-                    f"{newurl[:60]!r}",
-                    headers, fp)
+                    newurl,
+                    code,
+                    f"refusing redirect to a private destination — {reason}: {loggable(newurl)!r}",
+                    headers,
+                    fp,
+                )
         new = super().redirect_request(req, fp, code, msg, headers, newurl)
         return self._strip_credentials_across_hosts(req, new)
 
     #: Headers that authenticate the caller rather than describe the body.
     #: stdlib strips only `content-length`/`content-type`, so everything here
     #: rode along to whatever answered the redirect.
-    CREDENTIAL_HEADERS = frozenset({
-        "authorization", "proxy-authorization", "cookie",
-        "x-jeles-secret",           # institutional._post_remote's shared secret
-        "x-subscription-token",     # Brave
-        "x-api-key", "api-key",
-    })
+    CREDENTIAL_HEADERS = frozenset(
+        {
+            "authorization",
+            "proxy-authorization",
+            "cookie",
+            "x-jeles-secret",  # institutional._post_remote's shared secret
+            "x-subscription-token",  # Brave
+            "x-api-key",
+            "api-key",
+        }
+    )
 
     @classmethod
     def _strip_credentials_across_hosts(cls, old, new):
@@ -314,11 +346,13 @@ class SchemeGuardedRedirects(urllib.request.HTTPRedirectHandler):
         """
         if new is None:
             return new
+
         def host_of(u):
             try:
                 return (urllib.parse.urlsplit(u).hostname or "").rstrip(".").lower()
             except ValueError:
                 return None
+
         old_host, new_host = host_of(old.full_url), host_of(new.full_url)
         # `None` means unparseable on either side: treat as a change, not as a
         # match, so an unreadable URL does not inherit the credential.
@@ -337,8 +371,9 @@ _OPENERS: dict[tuple[frozenset[str], bool], urllib.request.OpenerDirector] = {}
 _OPENER_LOCK = threading.Lock()
 
 
-def opener(allowed: frozenset[str], *, allow_private: bool = False
-           ) -> urllib.request.OpenerDirector:
+def opener(
+    allowed: frozenset[str], *, allow_private: bool = False
+) -> urllib.request.OpenerDirector:
     """The shared opener for one scheme policy, built on first use.
 
     Assembled by hand rather than with `build_opener`, which installs handlers
@@ -372,8 +407,7 @@ def opener(allowed: frozenset[str], *, allow_private: bool = False
         return _OPENERS[key]
 
 
-def check_url(url: str, allowed: frozenset[str], *,
-              allow_private: bool = False) -> None:
+def check_url(url: str, allowed: frozenset[str], *, allow_private: bool = False) -> None:
     """Raise unless this URL may be opened. The pre-flight half of `urlopen`.
 
     Factored out because `sources` composes its own opener rather than calling
@@ -384,18 +418,21 @@ def check_url(url: str, allowed: frozenset[str], *,
     did not run. Both callers now share these lines rather than agreeing to.
     """
     if not scheme_ok(url, allowed):
-        raise ValueError(
-            f"refusing URL scheme outside {sorted(allowed)}: {url[:60]!r}")
+        raise ValueError(f"refusing URL scheme outside {sorted(allowed)}: {loggable(url)!r}")
     if allow_private:
         return
     reason = private_destination(url)
     if reason is not None:
-        raise ValueError(
-            f"refusing a private destination — {reason}: {url[:60]!r}")
+        raise ValueError(f"refusing a private destination — {reason}: {loggable(url)!r}")
 
 
-def urlopen(req: urllib.request.Request, *, allowed: frozenset[str],
-            timeout: float, allow_private: bool = False):
+def urlopen(
+    req: urllib.request.Request,
+    *,
+    allowed: frozenset[str],
+    timeout: float,
+    allow_private: bool = False,
+):
     """Open a request, refusing a disallowed scheme on the first URL and on
     every redirect hop.
 
@@ -417,13 +454,19 @@ def read_capped(resp: Any, max_bytes: int) -> bytes:
     return raw
 
 
-def fetch(url: str, *, allowed: frozenset[str], timeout: float, max_bytes: int,
-          headers: dict | None = None, data: bytes | None = None,
-          allow_private: bool = False) -> bytes:
+def fetch(
+    url: str,
+    *,
+    allowed: frozenset[str],
+    timeout: float,
+    max_bytes: int,
+    headers: dict | None = None,
+    data: bytes | None = None,
+    allow_private: bool = False,
+) -> bytes:
     """Open and read in one call, so no caller ever holds a response it could
     read unbounded. This is the only shape that makes the cap structural rather
     than remembered — six of eight egress sites in `sources` had skipped it."""
     req = urllib.request.Request(url, data=data, headers=headers or {})
-    with urlopen(req, allowed=allowed, timeout=timeout,
-                 allow_private=allow_private) as resp:
+    with urlopen(req, allowed=allowed, timeout=timeout, allow_private=allow_private) as resp:
         return read_capped(resp, max_bytes)

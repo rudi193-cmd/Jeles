@@ -18,6 +18,7 @@ The last test plants a one-byte change in a copy of the body and proves the
 comparison catches it, so an edit to `_body()` or to the hashing that quietly
 stopped comparing content could not pass this file by accident.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -45,7 +46,7 @@ LOCAL_OVERRIDES: tuple[tuple[str, str], ...] = ()
 def _body(source: str) -> str:
     """The vendored part: from the `from __future__` line to end of file. The
     module docstring above it is local and stays out of the hash."""
-    return source[source.index(_BODY_STARTS_AT):]
+    return source[source.index(_BODY_STARTS_AT) :]
 
 
 def _sha256(text: str) -> str:

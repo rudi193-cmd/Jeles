@@ -34,6 +34,7 @@ containing that string and defeated by passing the flag positionally. So the
 posture assertions below run the lanes and observe what they pass, and the
 resolution property is pinned on the path that actually uses it.
 """
+
 from __future__ import annotations
 
 import io
@@ -108,9 +109,11 @@ def unproxied(monkeypatch):
 @pytest.fixture
 def proxied(monkeypatch):
     """Force the proxied path, where the destination is not the TCP peer."""
-    monkeypatch.setattr(_egress.urllib.request, "getproxies",
-                        lambda: {"http": "http://proxy:8080",
-                                 "https": "http://proxy:8080"})
+    monkeypatch.setattr(
+        _egress.urllib.request,
+        "getproxies",
+        lambda: {"http": "http://proxy:8080", "https": "http://proxy:8080"},
+    )
     monkeypatch.setattr(_egress.urllib.request, "proxy_bypass", lambda host: False)
 
 
@@ -137,6 +140,7 @@ def _no_live_dns(monkeypatch, request):
 
 class _Req:
     """The minimum urllib's redirect handler touches."""
+
     full_url = "https://api.crossref.org/works?query=x"
     headers: ClassVar[dict] = {}
     unredirected_hdrs: ClassVar[dict] = {}
@@ -153,8 +157,7 @@ class _Req:
 
 
 def _redirect(handler, url, req=None):
-    return handler.redirect_request(req or _Req(), io.BytesIO(b""), 302,
-                                    "Found", {}, url)
+    return handler.redirect_request(req or _Req(), io.BytesIO(b""), 302, "Found", {}, url)
 
 
 def _lower(req):
@@ -198,8 +201,9 @@ def test_a_percent_encoded_host_cannot_smuggle_a_private_address(label, url):
         _redirect(handler, url)
 
 
-@pytest.mark.parametrize(("label", "url"), _ALTERNATE_LITERALS,
-                         ids=[p[0] for p in _ALTERNATE_LITERALS])
+@pytest.mark.parametrize(
+    ("label", "url"), _ALTERNATE_LITERALS, ids=[p[0] for p in _ALTERNATE_LITERALS]
+)
 def test_alternate_literal_encodings_are_refused_without_a_lookup(label, url, proxied):
     """`inet_aton` reads these; `ip_address` does not.
 
@@ -238,16 +242,15 @@ def test_a_name_that_resolves_private_is_caught(monkeypatch, unproxied):
     by pointing a public name at 127.0.0.1. willow-mcp's own fetch guard
     inspects the literal host and stops, so it has exactly that hole."""
     monkeypatch.setattr(
-        _egress.socket, "getaddrinfo",
-        lambda host, port, *a, **k: [(2, 1, 6, "", ("127.0.0.1", 0))])
+        _egress.socket, "getaddrinfo", lambda host, port, *a, **k: [(2, 1, 6, "", ("127.0.0.1", 0))]
+    )
     reason = _egress.private_destination("https://totally-legit.example/x")
     assert reason is not None
     assert "127.0.0.1" in reason
     assert "totally-legit.example" in reason, "should say the name it resolved from"
 
 
-def test_the_resolving_check_runs_on_the_redirect_path_not_only_standalone(
-        monkeypatch, unproxied):
+def test_the_resolving_check_runs_on_the_redirect_path_not_only_standalone(monkeypatch, unproxied):
     """The property above, pinned where it is actually used.
 
     Every entry in `_PRIVATE` is a literal, so deleting the resolution step —
@@ -256,8 +259,10 @@ def test_the_resolving_check_runs_on_the_redirect_path_not_only_standalone(
     `private_destination` and by nothing on the redirect path.
     """
     monkeypatch.setattr(
-        _egress.socket, "getaddrinfo",
-        lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", 0))])
+        _egress.socket,
+        "getaddrinfo",
+        lambda host, port, *a, **k: [(2, 1, 6, "", ("169.254.169.254", 0))],
+    )
     handler = _egress.SchemeGuardedRedirects(_egress.HTTPS_ONLY)
     with pytest.raises(urllib.error.HTTPError, match=r"169\.254\.169\.254"):
         _redirect(handler, "https://looks-fine.example/x")
@@ -266,6 +271,7 @@ def test_the_resolving_check_runs_on_the_redirect_path_not_only_standalone(
 def test_a_name_that_does_not_resolve_is_not_refused(monkeypatch, unproxied):
     """The connection is about to fail on its own. Refusing here would report a
     security decision for what is really a DNS failure."""
+
     def boom(*a, **k):
         raise OSError("Name or service not known")
 
@@ -294,8 +300,7 @@ def test_the_opener_cache_does_not_share_across_destination_policies():
     assert strict is not loose
 
     def guard_of(o):
-        return next(h for h in o.handlers
-                    if isinstance(h, _egress.SchemeGuardedRedirects))
+        return next(h for h in o.handlers if isinstance(h, _egress.SchemeGuardedRedirects))
 
     assert guard_of(strict).allow_private is False
     assert guard_of(loose).allow_private is True
@@ -339,8 +344,7 @@ def test_the_sources_lane_takes_the_secure_default(monkeypatch):
     assert sources._SchemeGuardedRedirects().allow_private is False
 
     seen = {}
-    monkeypatch.setattr(_egress, "opener",
-                        lambda allowed, **kw: seen.update(kw) or object())
+    monkeypatch.setattr(_egress, "opener", lambda allowed, **kw: seen.update(kw) or object())
     sources._opener()
     assert seen.get("allow_private", False) is False
 
@@ -352,8 +356,7 @@ def test_the_remote_delegate_lane_opts_out(monkeypatch):
     from jeles import institutional
 
     seen = {}
-    monkeypatch.setattr(_egress, "fetch",
-                        lambda url, **kw: seen.update(kw) or b"{}")
+    monkeypatch.setattr(_egress, "fetch", lambda url, **kw: seen.update(kw) or b"{}")
     institutional._post_remote("https://box.internal", {"q": "x"}, "s3cret")
     assert seen["allow_private"] is True
 
@@ -368,8 +371,7 @@ def test_the_open_web_lane_no_longer_opts_out_for_every_backend(monkeypatch):
     from jeles.reactions import search_adapter
 
     seen = {}
-    monkeypatch.setattr(_egress, "fetch",
-                        lambda url, **kw: seen.update(kw) or b"{}")
+    monkeypatch.setattr(_egress, "fetch", lambda url, **kw: seen.update(kw) or b"{}")
     search_adapter._get_json("https://api.duckduckgo.com/?q=x")
     assert seen["allow_private"] is False
 
@@ -381,13 +383,20 @@ def test_fetch_forwards_the_destination_policy(monkeypatch):
     seen = {}
 
     class _Resp:
-        def __enter__(self): return io.BytesIO(b"{}")
-        def __exit__(self, *a): return False
+        def __enter__(self):
+            return io.BytesIO(b"{}")
 
-    monkeypatch.setattr(_egress, "urlopen",
-                        lambda req, **kw: seen.update(kw) or _Resp())
-    _egress.fetch("https://arxiv.org/x", allowed=_egress.HTTPS_ONLY,
-                  timeout=1, max_bytes=10, allow_private=True)
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(_egress, "urlopen", lambda req, **kw: seen.update(kw) or _Resp())
+    _egress.fetch(
+        "https://arxiv.org/x",
+        allowed=_egress.HTTPS_ONLY,
+        timeout=1,
+        max_bytes=10,
+        allow_private=True,
+    )
     assert seen["allow_private"] is True
 
 
@@ -405,8 +414,10 @@ def test_behind_a_proxy_a_name_is_not_resolved_here(proxied, monkeypatch):
     take the sources lane down outright.
     """
     monkeypatch.setattr(
-        _egress.socket, "getaddrinfo",
-        lambda *a, **k: pytest.fail("resolved a name on the proxied path"))
+        _egress.socket,
+        "getaddrinfo",
+        lambda *a, **k: pytest.fail("resolved a name on the proxied path"),
+    )
     assert _egress.private_destination("https://api.crossref.org/works") is None
 
 
@@ -426,8 +437,11 @@ def test_a_trailing_dot_does_not_launder_a_literal_address(proxied):
     `CONNECT 169.254.169.254.:443` and the proxy resolved it, breaking this
     module's stated invariant that a literal is refused proxy or not.
     Run on the proxied path deliberately: that is where it was reachable."""
-    for url in ("https://127.0.0.1./x", "https://169.254.169.254./latest/",
-                "https://127.0.0.1%2e/x"):
+    for url in (
+        "https://127.0.0.1./x",
+        "https://169.254.169.254./latest/",
+        "https://127.0.0.1%2e/x",
+    ):
         assert _egress.private_destination(url) is not None, url
 
 
@@ -437,11 +451,11 @@ def test_a_credential_header_is_dropped_when_a_redirect_changes_host():
     `X-Jeles-Secret` — cross-host, over plaintext, on the one lane that opts
     out of the destination check. requests does this in `rebuild_auth`;
     urllib has no equivalent."""
-    handler = _egress.SchemeGuardedRedirects(_egress.HTTP_OR_HTTPS,
-                                             allow_private=True)
-    req = _req("https://remote.operator.example/search",
-               **{"X-Jeles-Secret": "SECRET", "X-Subscription-Token": "BRAVE",
-                  "User-Agent": "jeles"})
+    handler = _egress.SchemeGuardedRedirects(_egress.HTTP_OR_HTTPS, allow_private=True)
+    req = _req(
+        "https://remote.operator.example/search",
+        **{"X-Jeles-Secret": "SECRET", "X-Subscription-Token": "BRAVE", "User-Agent": "jeles"},
+    )
     out = _redirect(handler, "http://attacker.example/collect", req)
     got = _lower(out)
     assert "x-jeles-secret" not in got
@@ -452,10 +466,8 @@ def test_a_credential_header_is_dropped_when_a_redirect_changes_host():
 def test_a_credential_header_survives_a_same_host_redirect():
     """The other half. Stripping unconditionally would break every ordinary
     redirect an authenticated API performs on itself."""
-    handler = _egress.SchemeGuardedRedirects(_egress.HTTP_OR_HTTPS,
-                                             allow_private=True)
-    req = _req("https://api.crossref.org/works",
-               **{"X-Api-Key": "K", "User-Agent": "jeles"})
+    handler = _egress.SchemeGuardedRedirects(_egress.HTTP_OR_HTTPS, allow_private=True)
+    req = _req("https://api.crossref.org/works", **{"X-Api-Key": "K", "User-Agent": "jeles"})
     out = _redirect(handler, "https://api.crossref.org/works/v2", req)
     assert _lower(out).get("x-api-key") == "K"
 
@@ -477,8 +489,9 @@ def test_the_open_web_lane_only_opts_out_for_the_operators_own_backend(monkeypat
     from jeles.reactions import search_adapter
 
     seen: list[bool] = []
-    monkeypatch.setattr(_egress, "fetch",
-                        lambda url, **kw: seen.append(kw["allow_private"]) or b"{}")
+    monkeypatch.setattr(
+        _egress, "fetch", lambda url, **kw: seen.append(kw["allow_private"]) or b"{}"
+    )
 
     monkeypatch.setenv("JELES_SEARXNG_URL", "http://127.0.0.1:8888")
     search_adapter._searxng("q")

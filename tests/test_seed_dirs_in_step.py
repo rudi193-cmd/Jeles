@@ -36,10 +36,7 @@ def _seed_names(seed_dir: Path) -> set[str]:
 def _diverging_files(a: Path, b: Path) -> list[str]:
     """Names present in both `a` and `b` whose bytes differ."""
     common = _seed_names(a) & _seed_names(b)
-    return sorted(
-        name for name in common
-        if (a / name).read_bytes() != (b / name).read_bytes()
-    )
+    return sorted(name for name in common if (a / name).read_bytes() != (b / name).read_bytes())
 
 
 def test_both_seed_dirs_have_the_same_74_files():

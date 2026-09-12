@@ -70,8 +70,11 @@ _forward_failed = 0
 
 
 def _use_willow_mcp() -> bool:
-    return (os.environ.get("ASK_JELES_USE_WILLOW_MCP", "1").strip().lower()
-            not in ("0", "false", "no"))
+    return os.environ.get("ASK_JELES_USE_WILLOW_MCP", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
 
 
 def _subprocess_env() -> dict[str, str]:
@@ -83,8 +86,7 @@ def _subprocess_env() -> dict[str, str]:
     Pass only what willow-mcp needs: PATH/HOME, locale, and ``WILLOW_*`` config.
     """
     keep = {"PATH", "HOME", "LANG", "TERM", "TMPDIR", "USER", "LOGNAME"}
-    return {k: v for k, v in os.environ.items()
-            if k in keep or k.startswith(("LC_", "WILLOW_"))}
+    return {k: v for k, v in os.environ.items() if k in keep or k.startswith(("LC_", "WILLOW_"))}
 
 
 def _launch() -> tuple[str, list[str]] | None:

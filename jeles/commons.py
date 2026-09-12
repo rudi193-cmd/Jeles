@@ -5,6 +5,7 @@ Commons (π, Newton's laws, core "way things work" domains) land at the
 Novel synthesis (operator research, institutional genealogy) stays ``asserted``
 until a human verifies or conflict_scan corroborates.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -104,7 +105,10 @@ def seed_pair_verification(
         claimant = (pair.get("verified_by") or data.get("verified_by") or "").strip()
         return "human", claimant or NOVEL_VERIFIED_BY
     bucket = classification_for_pair(
-        domain=domain, pair=pair, data=data, sources=sources,
+        domain=domain,
+        pair=pair,
+        data=data,
+        sources=sources,
     )
     if bucket == "commons" and domain_is_commons(domain, data):
         return "machine", COMMONS_VERIFIED_BY
@@ -120,7 +124,10 @@ def verification_for_intake(
 ) -> tuple[str, str, list[str]]:
     """Return (verification_kind, verified_by, extra_tags)."""
     bucket = classification_for_pair(
-        domain=domain, pair=pair, data=data, sources=sources,
+        domain=domain,
+        pair=pair,
+        data=data,
+        sources=sources,
     )
     tags: list[str] = []
     if bucket == "commons":
@@ -131,16 +138,12 @@ def verification_for_intake(
 
 
 def seed_nugget_id(domain: str, question: str) -> str:
-    digest = hashlib.sha256(
-        f"jeles-seed\0{domain}\0{question}".encode()
-    ).hexdigest()
+    digest = hashlib.sha256(f"jeles-seed\0{domain}\0{question}".encode()).hexdigest()
     return f"s{digest[:10]}"
 
 
 def intake_nugget_id(domain: str, question: str) -> str:
-    digest = hashlib.sha256(
-        f"jeles-intake\0{domain}\0{question}".encode()
-    ).hexdigest()
+    digest = hashlib.sha256(f"jeles-intake\0{domain}\0{question}".encode()).hexdigest()
     return f"i{digest[:10]}"
 
 

@@ -72,7 +72,7 @@ def test_base_package_declares_no_runtime_dependencies():
         return
 
     # Extras are declared as `name; extra == "mcp"` — those are opt-in and fine.
-    unconditional = [r for r in declared if 'extra ==' not in r]
+    unconditional = [r for r in declared if "extra ==" not in r]
     assert not unconditional, (
         "base `jeles` must declare zero runtime dependencies so that hosts "
         "inherit no version constraints from it; found: "

@@ -4,6 +4,7 @@ Intake files live outside this package by default (willow-memory/jeles-intake/).
 Run via ``scripts/jeles-intake.py`` from the Jeles checkout, or
 ``willow-memory/scripts/jeles-intake.py`` — both call :func:`main`.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,10 +45,12 @@ def bootstrap_fleet_env() -> None:
     wh = os.environ.get("WILLOW_HOME", "").strip()
     if wh:
         candidates.append(Path(wh) / "fleet.env")
-    candidates.extend([
-        root.parent.parent / "willow-memory" / ".willow" / "fleet.env",
-        Path.home() / "github" / "willow-memory" / ".willow" / "fleet.env",
-    ])
+    candidates.extend(
+        [
+            root.parent.parent / "willow-memory" / ".willow" / "fleet.env",
+            Path.home() / "github" / "willow-memory" / ".willow" / "fleet.env",
+        ]
+    )
     for path in candidates:
         if not path.is_file():
             continue
@@ -76,10 +79,7 @@ def _load_json(path: Path) -> dict:
 
 
 def intake_files(intake_dir: Path) -> list[Path]:
-    return sorted(
-        p for p in intake_dir.glob("*.json")
-        if p.name not in SKIP_LOAD and p.is_file()
-    )
+    return sorted(p for p in intake_dir.glob("*.json") if p.name not in SKIP_LOAD and p.is_file())
 
 
 def load_file(path: Path, *, dry_run: bool, intake_dir: Path) -> dict[str, int]:
@@ -87,8 +87,7 @@ def load_file(path: Path, *, dry_run: bool, intake_dir: Path) -> dict[str, int]:
 
     data = _load_json(path)
     domain = data.get("domain", path.stem)
-    counts = {"created": 0, "updated": 0, "existing": 0, "errors": 0,
-              "commons": 0, "novel": 0}
+    counts = {"created": 0, "updated": 0, "existing": 0, "errors": 0, "commons": 0, "novel": 0}
     rel = path.relative_to(intake_dir) if path.is_relative_to(intake_dir) else path.name
 
     from .commons import intake_nugget_id, verification_for_intake
@@ -96,16 +95,16 @@ def load_file(path: Path, *, dry_run: bool, intake_dir: Path) -> dict[str, int]:
     for pair in data.get("pairs", []):
         question = pair["source_text"].strip()
         answer = pair["target_text"].strip()
-        sources = [
-            str(s)
-            for s in (pair.get("sources") or [f"jeles-intake/{rel}"])
-        ]
+        sources = [str(s) for s in (pair.get("sources") or [f"jeles-intake/{rel}"])]
         tags = [domain, "willow-intake"]
         if pair.get("reason"):
             tags.append("has-reason")
 
         kind, verified_by, extra_tags = verification_for_intake(
-            domain=domain, pair=pair, data=data, sources=sources,
+            domain=domain,
+            pair=pair,
+            data=data,
+            sources=sources,
         )
         tags.extend(extra_tags)
 
@@ -264,10 +263,7 @@ def main(argv: list[str] | None = None) -> int:
             open_gaps = corpus_list_open()
             print(f"\n== open Jeles gaps ({len(open_gaps)} total)")
             for row in open_gaps[:25]:
-                print(
-                    f"  [{row.get('asked_count', 1):>3}x] "
-                    f"{row.get('question', '')[:100]}"
-                )
+                print(f"  [{row.get('asked_count', 1):>3}x] {row.get('question', '')[:100]}")
         return 0
 
     totals = load_all(intake_dir, dry_run=args.dry_run)
@@ -288,9 +284,6 @@ def main(argv: list[str] | None = None) -> int:
         open_gaps = corpus_list_open()
         print(f"\n== open Jeles gaps ({len(open_gaps)} total, research queue)")
         for row in open_gaps[:25]:
-            print(
-                f"  [{row.get('asked_count', 1):>3}x] "
-                f"{row.get('question', '')[:100]}"
-            )
+            print(f"  [{row.get('asked_count', 1):>3}x] {row.get('question', '')[:100]}")
 
     return 0 if totals["errors"] == 0 else 1

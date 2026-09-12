@@ -16,6 +16,7 @@ sharing a scope, so a merge commit there displaced a real one and a shipped fix
 went undocumented. That has not happened here yet, which is the point of adding
 the guard now rather than after.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -31,8 +32,8 @@ changelog_dedup = pytest.importorskip("changelog_dedup")
 
 _BASE = "https://github.com/rudi193-cmd/Jeles"
 _DESC = "**sources:** declare the hosts each source contacts"
-_MERGE = "bbc8258e9620c1e39630f47357fbd82379ea3479"   # merge of #27
-_REAL = "455be56673f62c42d097ca3bcf5819c64268bfe9"    # the commit it merged
+_MERGE = "bbc8258e9620c1e39630f47357fbd82379ea3479"  # merge of #27
+_REAL = "455be56673f62c42d097ca3bcf5819c64268bfe9"  # the commit it merged
 
 
 def _bullet(sha: str) -> str:
@@ -44,21 +45,29 @@ def _bullet(sha: str) -> str:
 def _section(*shas: str) -> str:
     """A 0.5.0 section containing exactly these entries, followed by 0.4.1's
     header so `rebuild` has a boundary to stop at."""
-    return "\n".join([
-        f"## [0.5.0]({_BASE}/compare/v0.4.1...v0.5.0) (2026-08-04)",
-        "", "", "### Added", "",
-        *[_bullet(s) for s in shas],
-        "",
-        f"## [0.4.1]({_BASE}/compare/v0.4.0...v0.4.1) (2026-08-03)",
-        "",
-    ])
+    return "\n".join(
+        [
+            f"## [0.5.0]({_BASE}/compare/v0.4.1...v0.5.0) (2026-08-04)",
+            "",
+            "",
+            "### Added",
+            "",
+            *[_bullet(s) for s in shas],
+            "",
+            f"## [0.4.1]({_BASE}/compare/v0.4.0...v0.4.1) (2026-08-03)",
+            "",
+        ]
+    )
 
 
 def _has(*revs: str) -> bool:
     """Are these objects present? CI may use a shallow clone."""
     return all(
-        subprocess.run(["git", "-C", str(_REPO), "rev-parse", "--verify", f"{r}^{{commit}}"],
-                       capture_output=True).returncode == 0
+        subprocess.run(
+            ["git", "-C", str(_REPO), "rev-parse", "--verify", f"{r}^{{commit}}"],
+            capture_output=True,
+        ).returncode
+        == 0
         for r in revs
     )
 
@@ -108,7 +117,7 @@ def test_the_hidden_types_in_that_range_stay_out():
 def test_the_repo_changelog_is_already_correct():
     """Idempotence against the real file. A failure means either the changelog
     drifted or a release landed without the workflow step running."""
-    text = (_REPO / "CHANGELOG.md").read_text()
+    text = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     try:
         _, summary = changelog_dedup.rebuild(text)
     except changelog_dedup.Bail as exc:
@@ -173,7 +182,7 @@ def test_print_section_emits_exactly_what_a_release_body_should_be():
 
     The shape matters: release-please's body starts with the `## [x.y.z](…)`
     header, so the extracted section must include it."""
-    text = (_REPO / "CHANGELOG.md").read_text()
+    text = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     section = changelog_dedup.section_for(text, "0.5.0")
     assert section is not None
     assert section.splitlines()[0].startswith("## [0.5.0]("), section.splitlines()[0]
@@ -186,7 +195,7 @@ def test_print_section_emits_exactly_what_a_release_body_should_be():
 
 def test_print_section_is_none_for_an_unknown_version():
     """The workflow warns and leaves the release alone rather than blanking it."""
-    text = (_REPO / "CHANGELOG.md").read_text()
+    text = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     assert changelog_dedup.section_for(text, "99.99.99") is None
 
 
@@ -224,18 +233,23 @@ def _generated_above_hand_written(hand_written_heading: str = "### Added") -> st
     link. `hand_written_heading` picks whether the section below uses a
     configured name (the silent-rewrite case) or a hidden one (the bail
     case)."""
-    return "\n".join([
-        f"## [0.14.0]({_BASE}/compare/v0.13.0...v0.14.0) (2026-09-02)",
-        "", "", "### Added", "",
-        f"* something ([abc1234]({_BASE}/commit/abc1234))",
-        "",
-        "## 0.0.9 — 2026-01-01",
-        "",
-        hand_written_heading,
-        "",
-        "* hand-written entry that must survive",
-        "",
-    ])
+    return "\n".join(
+        [
+            f"## [0.14.0]({_BASE}/compare/v0.13.0...v0.14.0) (2026-09-02)",
+            "",
+            "",
+            "### Added",
+            "",
+            f"* something ([abc1234]({_BASE}/commit/abc1234))",
+            "",
+            "## 0.0.9 — 2026-01-01",
+            "",
+            hand_written_heading,
+            "",
+            "* hand-written entry that must survive",
+            "",
+        ]
+    )
 
 
 def test_section_for_stops_at_a_hand_written_heading_without_a_compare_link():

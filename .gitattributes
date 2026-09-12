@@ -1,0 +1,9 @@
+# Check every text file out with LF on every platform. GitHub's Windows
+# runners set core.autocrlf=true, which rewrites text files to CRLF at
+# checkout; three test files hash or byte-compare files in this tree
+# (tests/test_fleet_conventions.py's sha256 pin of tests/fleet_conventions.json,
+# tests/test_vendor_pins.py, tests/test_seed_dirs_in_step.py), and a CRLF
+# checkout would make the pinned bytes differ from the committed ones on
+# Windows alone. The index carries no CRLF files, so this changes nothing on
+# Linux and macOS.
+* text=auto eol=lf

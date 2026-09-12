@@ -44,6 +44,7 @@ Every real-tree check below has a planted twin that runs the same helper
 against a synthetic tree or document carrying the violation, so a helper that
 stopped checking could not pass this file by accident.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -208,13 +209,22 @@ def test_the_armed_tree_check_fires_on_a_planted_tree_missing_the_guard(tmp_path
 
 
 def test_the_hidden_set_check_catches_a_planted_config_that_unhides_ci():
-    planted = json.dumps({"packages": {".": {"changelog-sections": [
-        {"type": "feat", "section": "Added"},
-        {"type": "docs", "section": "Docs", "hidden": True},
-        {"type": "test", "section": "Tests", "hidden": True},
-        {"type": "ci", "section": "CI"},
-        {"type": "chore", "section": "Chores", "hidden": True},
-    ], "$comment-what-cuts-a-release": "kept"}}})
+    planted = json.dumps(
+        {
+            "packages": {
+                ".": {
+                    "changelog-sections": [
+                        {"type": "feat", "section": "Added"},
+                        {"type": "docs", "section": "Docs", "hidden": True},
+                        {"type": "test", "section": "Tests", "hidden": True},
+                        {"type": "ci", "section": "CI"},
+                        {"type": "chore", "section": "Chores", "hidden": True},
+                    ],
+                    "$comment-what-cuts-a-release": "kept",
+                }
+            }
+        }
+    )
     assert _config_hidden_types(planted) == {"chore", "docs", "test"}
     assert _config_visible_types(planted) == {"ci", "feat"}, "the unhidden ci: would cut releases"
     assert _config_missing_comments(planted, RULES["required_config_comments"]) == [

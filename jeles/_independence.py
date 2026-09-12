@@ -23,6 +23,7 @@ load (`tests/test_import_purity.py`). `urllib.parse` is pure string work; note
 that it is emphatically *not* `urllib.request`, which is the one this package
 keeps behind :mod:`jeles._egress`.
 """
+
 from __future__ import annotations
 
 import re
@@ -43,10 +44,24 @@ MIN_INDEPENDENT_SOURCES = 2
 
 # Two-label public suffixes: without these, foo.co.uk and bar.co.uk both reduce
 # to "co.uk" and read as one source. Small, common set — not a full PSL.
-_TWO_LABEL_SUFFIXES = frozenset({
-    "co.uk", "org.uk", "ac.uk", "gov.uk", "co.jp", "or.jp", "ne.jp",
-    "com.au", "net.au", "org.au", "co.nz", "com.br", "co.in", "co.za",
-})
+_TWO_LABEL_SUFFIXES = frozenset(
+    {
+        "co.uk",
+        "org.uk",
+        "ac.uk",
+        "gov.uk",
+        "co.jp",
+        "or.jp",
+        "ne.jp",
+        "com.au",
+        "net.au",
+        "org.au",
+        "co.nz",
+        "com.br",
+        "co.in",
+        "co.za",
+    }
+)
 
 _IPV4_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
 
