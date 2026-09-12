@@ -55,6 +55,26 @@ def _literal_hosts(fn: ast.FunctionDef) -> set[str]:
     return hosts
 
 
+def test_the_host_scan_catches_every_planted_literal_shape():
+    """Planted: a function carrying every shape the scan claims to read — a
+    plain literal, an f-string whose host sits in the constant prefix, and an
+    http (not https) URL — plus an f-string whose host is *interpolated*, which
+    the scan must not report as a host it cannot name. A scan that lost the
+    f-string prefix would clear most of `sources.py`, whose endpoints are
+    written `f"https://host/path?q={q}"`."""
+    fn = ast.parse(
+        "def search_planted(q):\n"
+        "    a = 'https://plain.example.org/api'\n"
+        "    b = f'https://fmt.example.org/search?q={q}'\n"
+        "    c = 'http://insecure.example.org/x'\n"
+        "    d = f'https://{host}/search'\n"
+        "    return a, b, c, d\n"
+    ).body[0]
+    assert _literal_hosts(fn) == {
+        "plain.example.org", "fmt.example.org", "insecure.example.org",
+    }
+
+
 def test_every_source_declares_the_hosts_its_code_mentions():
     """Undeclared host -> a consumer's picture of jeles' egress is incomplete."""
     undeclared = {}

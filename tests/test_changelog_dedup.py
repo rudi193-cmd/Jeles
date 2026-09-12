@@ -68,6 +68,11 @@ needs_history = pytest.mark.skipif(
     reason="needs full history and tags (shallow clone)",
 )
 
+needs_recent_tags = pytest.mark.skipif(
+    not _has("v0.13.0", "v0.14.0"),
+    reason="needs the v0.13.0..v0.14.0 tags (shallow clone)",
+)
+
 
 @needs_history
 def test_it_drops_the_duplicate_release_please_emitted_for_0_5_0():
@@ -183,3 +188,113 @@ def test_print_section_is_none_for_an_unknown_version():
     """The workflow warns and leaves the release alone rather than blanking it."""
     text = (_REPO / "CHANGELOG.md").read_text()
     assert changelog_dedup.section_for(text, "99.99.99") is None
+
+
+# ── the two latent defects the 2026-09-12 re-sync from Forge closed ──────────
+#
+# The body of `tools/changelog_dedup.py` is vendored from forge-play/Forge
+# (`tests/test_vendor_pins.py` pins it). Before the re-sync this copy was 45
+# lines behind, and the difference was two defects, both reproduced here
+# against the old body before it was replaced:
+#
+#   (a) a section's end was matched on `## [` only, not on any `## ` heading.
+#       A hand-written heading without a compare link (`## 0.0.9 — date`, the
+#       shape Forge's backfilled history uses) did not end the generated
+#       section above it, so `section_for` returned the hand-written history
+#       inside the release body, and `rebuild` either bailed on the first
+#       hidden heading it met down there (`### Docs`) or — with only
+#       configured headings below — silently REPLACED the hand-written
+#       section with the commits' entries. This repo's own hand-written
+#       section is `## [0.1.0] — 2026-08-02`, which happens to start with
+#       `## [`, so the real file never tripped it; the defect was one heading
+#       style away.
+#
+#   (b) `main()` read CHANGELOG.md unguarded: a missing file was an uncaught
+#       FileNotFoundError (exit 1, which release-please.yml's
+#       `[ "$status" = "0" ] || exit "$status"` turns into a failed release job
+#       — the auto-merge arming after it never runs), and a changelog with no
+#       generated section at all was reported as an error (exit 2) when it is
+#       the ordinary "nothing to rebuild yet" state of a repo whose history
+#       was backfilled by hand.
+
+
+def _generated_above_hand_written(hand_written_heading: str = "### Added") -> str:
+    """A generated 0.14.0 section (a real tag range, so `rebuild` can read git)
+    above a hand-written `## 0.0.9 — date` section — Forge's shape, no compare
+    link. `hand_written_heading` picks whether the section below uses a
+    configured name (the silent-rewrite case) or a hidden one (the bail
+    case)."""
+    return "\n".join([
+        f"## [0.14.0]({_BASE}/compare/v0.13.0...v0.14.0) (2026-09-02)",
+        "", "", "### Added", "",
+        f"* something ([abc1234]({_BASE}/commit/abc1234))",
+        "",
+        "## 0.0.9 — 2026-01-01",
+        "",
+        hand_written_heading,
+        "",
+        "* hand-written entry that must survive",
+        "",
+    ])
+
+
+def test_section_for_stops_at_a_hand_written_heading_without_a_compare_link():
+    """Defect (a), the read half. `--print-section` feeds the GitHub Release
+    body; before the re-sync it would have shipped the hand-written history
+    below the generated section inside it."""
+    section = changelog_dedup.section_for(_generated_above_hand_written(), "0.14.0")
+    assert section is not None
+    assert "## 0.0.9" not in section, "swallowed the hand-written section"
+    assert "hand-written entry" not in section
+
+
+@needs_recent_tags
+def test_rebuild_does_not_swallow_hand_written_history_below_the_generated_section():
+    """Defect (a), the write half, and the worse one. With the hand-written
+    section using a configured heading, nothing bailed: the old boundary ran to
+    end of file, the whole hand-written section became "the body", and the
+    rebuild replaced it with the commits' entries. Measured against the old
+    body: both the entry and its `## 0.0.9` heading were gone from the output."""
+    fixed, _ = changelog_dedup.rebuild(_generated_above_hand_written("### Added"))
+    assert "## 0.0.9 — 2026-01-01" in fixed, "the hand-written heading was rewritten away"
+    assert "* hand-written entry that must survive" in fixed, "hand-written history lost"
+
+
+@needs_recent_tags
+def test_a_hidden_heading_in_hand_written_history_does_not_make_rebuild_bail():
+    """Defect (a) as Forge first saw it: the old boundary reached the
+    hand-written `### Docs` heading, which is not a configured section, and
+    bailed on a section it was never meant to be reading."""
+    fixed, _ = changelog_dedup.rebuild(_generated_above_hand_written("### Docs"))
+    assert "### Docs" in fixed and "* hand-written entry that must survive" in fixed
+
+
+def test_the_cli_treats_a_hand_written_only_changelog_as_nothing_to_do(tmp_path, monkeypatch):
+    """Defect (b), first half. A changelog with only hand-written sections has
+    nothing to rebuild; the old body called that an error (exit 2). The
+    `--print-section` mode stays an error, and must: its stdout becomes a
+    GitHub Release body."""
+    changelog = tmp_path / "CHANGELOG.md"
+    original = "# Changelog\n\n## 0.0.1 — 2026-01-01\n\n### Added\n\n* x\n"
+    changelog.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(changelog_dedup, "CHANGELOG", changelog)
+
+    monkeypatch.setattr(sys, "argv", ["changelog_dedup.py"])
+    assert changelog_dedup.main() == 0
+    assert changelog.read_text(encoding="utf-8") == original, "it must not touch the file"
+
+    monkeypatch.setattr(sys, "argv", ["changelog_dedup.py", "--print-section", "0.0.1"])
+    assert changelog_dedup.main() == 2
+
+
+def test_the_cli_treats_a_missing_changelog_as_nothing_to_do(tmp_path, monkeypatch):
+    """Defect (b), second half. No CHANGELOG.md at all used to be an uncaught
+    FileNotFoundError — exit 1, which the release workflow turns into a failed
+    job. `--print-section` is still an error, for the same reason as above."""
+    monkeypatch.setattr(changelog_dedup, "CHANGELOG", tmp_path / "CHANGELOG.md")
+
+    monkeypatch.setattr(sys, "argv", ["changelog_dedup.py"])
+    assert changelog_dedup.main() == 0
+
+    monkeypatch.setattr(sys, "argv", ["changelog_dedup.py", "--print-section", "0.1.0"])
+    assert changelog_dedup.main() == 2
